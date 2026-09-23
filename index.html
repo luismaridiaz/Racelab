@@ -721,7 +721,7 @@ input[type=range]:focus-visible{
       <li><b>Baches</b> — cada rueda ve una altura; cambia Fz y el heave.</li>
       <li><b>Colisiones</b> — muro rojo en +Z. Test choque ~12 m/s.</li>
       <li><b>Tráfico</b> — hasta 10 coches. El ACC/AEB usan el más cercano delante.</li>
-      <li><b>GPS / telemetría</b> — lat/lon de juguete (origen Madrid), rumbo, TTC, lista de distancias.</li>
+      <li><b>GPS + IMU simulados</b> — proyección ENU (X este, Z norte) desde un origen por circuito. El GPS añade ruido y HDOP; el IMU integra el yaw-rate del chasis con bias. No hay constelación ni magnetómetro.</li>
     </ul>
 
     <div class="section-title" style="margin-top:14px;">Teclas</div>
@@ -1432,16 +1432,43 @@ input[type=range]:focus-visible{
           <div class="tele-item"><div class="tv" id="telRpm">0</div><div class="tl">rpm</div></div>
           <div class="tele-item"><div class="tv" id="telGear">1</div><div class="tl" data-i18n="tl_gear">marcha</div></div>
           <div class="tele-item"><div class="tv" id="telTtc">—</div><div class="tl">TTC s</div></div>
-          <div class="tele-item"><div class="tv" id="telLat">40.416800</div><div class="tl">lat</div></div>
-          <div class="tele-item"><div class="tv" id="telLon">-3.703800</div><div class="tl">lon</div></div>
-          <div class="tele-item"><div class="tv" id="telHdg">0</div><div class="tl" data-i18n="tl_hdg">rumbo °</div></div>
-          <div class="tele-item"><div class="tv" id="telAlt">650</div><div class="tl">alt m</div></div>
+          <div class="tele-item"><div class="tv" id="telX">0.0</div><div class="tl">X este m</div></div>
+          <div class="tele-item"><div class="tv" id="telZ">0.0</div><div class="tl">Z norte m</div></div>
+          <div class="tele-item"><div class="tv" id="telHdg">0</div><div class="tl">ψ chasis °</div></div>
+          <div class="tele-item"><div class="tv" id="telHdgImu">0</div><div class="tl">ψ IMU °</div></div>
+          <div class="tele-item"><div class="tv" id="telGpsErr">0.0</div><div class="tl">err. GPS m</div></div>
+          <div class="tele-item"><div class="tv" id="telHdop">1.2</div><div class="tl">HDOP sim.</div></div>
+          <div class="tele-item"><div class="tv" id="telYawFus">0</div><div class="tl">ψ fusión °</div></div>
+          <div class="tele-item"><div class="tv" id="telFusErr">0.0</div><div class="tl">err. fusión m</div></div>
+          <div class="tele-item"><div class="tv" id="telKfErr">0.0</div><div class="tl">err. Kalman m</div></div>
+          <div class="tele-item"><div class="tv" id="telKfP">—</div><div class="tl">σ_E, σ_N m</div></div>
+          <div class="tele-item"><div class="tv" id="telVoErr">0.0</div><div class="tl">err. VO m</div></div>
+          <div class="tele-item"><div class="tv" id="telEkfErr">0.0</div><div class="tl">err. EKF-SLAM m</div></div>
+          <div class="tele-item"><div class="tv" id="telPfErr">0.0</div><div class="tl">err. partículas m</div></div>
+          <div class="tele-item"><div class="tv" id="telLat">45.621600</div><div class="tl">lat medida</div></div>
+          <div class="tele-item"><div class="tv" id="telLon">9.281100</div><div class="tl">lon medida</div></div>
           <div class="tele-item"><div class="tv" id="telAero">0</div><div class="tl">aero N</div></div>
           <div class="tele-item"><div class="tv" id="telSlope">0.0/0.0</div><div class="tl">pend L/A °</div></div>
           <div class="tele-item"><div class="tv" id="telSurface">Asfalto</div><div class="tl">superficie</div></div>
           <div class="tele-item"><div class="tv" id="telTireWear">0%</div><div class="tl">desg. neumático</div></div>
         </div>
-        <div class="gps-wrap"><canvas id="gpsMap" role="img" aria-label="Mapa de posición GPS del vehículo"></canvas></div>
+        <div class="gps-wrap"><canvas id="gpsMap" role="img" aria-label="Mini-mapa del circuito, mismos ejes que la planta: X este, Z norte"></canvas></div>
+        <div id="fusLive" style="font-family:Menlo,monospace; font-size:11px; color:var(--text-primary); background:var(--bg-input); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; margin-top:8px; line-height:1.55;">
+          fusión en vivo —
+        </div>
+        <canvas id="fusErrChart" width="280" height="44" style="width:100%; height:44px; display:block; margin-top:6px; background:#16120e; border-radius:8px;"></canvas>
+        <div id="gpsAxisNote" style="font-size:11px; color:var(--text-secondary); line-height:1.45; margin:6px 2px 0;">
+          <b>Proyección ENU local.</b> Plano tangente en el origen del circuito:
+          +X este, +Z norte, +Y arriba (no se pinta). ψ=0 mira a +Z.
+          λ = λ₀ + X / (111320·cos φ₀), φ = φ₀ + Z / 111320. Válida a unos pocos km; no es UTM ni WGS84 geodésico.
+          <b>IMU:</b> gyro de yaw = r del chasis + bias + ruido; deriva respecto a ψ verdadero.
+          <b>GPS:</b> verdad + random walk + ruido·HDOP (σ≈2.2·HDOP m).
+          <b>Calibración IMU:</b> media de gyro/accel ~2 s con v&lt;0.4 m/s → bias restado al gyro.
+          <b>Fusión α:</b> complementario (violeta). <b>Kalman 4 estados</b> [E,N,vE,vN] (verde): predict accel, update GPS, P diagonal.
+          <b>VO</b> naranja. <b>EKF-SLAM</b> rosa: [E,N,ψ] + 3 hitos de sector (rango-rumbo ruidoso). <b>Partículas</b> aro blanco: 60 hipótesis, peso GPS+distancia a pista, resample si Neff&lt;0.4N.
+          Ninguno sustituye a un SLAM visual real.
+          <div style="margin-top:6px;"><button type="button" class="btn btn-secondary" id="btnImuCal" style="padding:8px 10px;">Calibrar IMU (parado)</button></div>
+        </div>
         <div class="section-title" style="margin-top:12px;">Telemetría en vivo por rueda</div>
         <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px;">
           <div class="chart-box mini"><div class="ct" id="teleSlipLabel">Deslizamiento (m/s)</div><canvas id="teleChartSlip" role="img" aria-labelledby="teleSlipLabel" height="70"></canvas></div>
@@ -2172,7 +2199,7 @@ var vehicle = {
   accOn: false, accKph: 80, accGap: 2,
   lkaOn: false, lkaGain: 0.7,
   aebOn: false, aebTtc: 1.4, leadDist: 40, leadSpeed: 12,
-  gpsLat0: 40.4168, gpsLon0: -3.7038, gpsAlt0: 650,
+  gpsLat0: 40.4168, gpsLon0: -3.7038, gpsAlt0: 650, gpsOriginLabel: 'Madrid (por defecto)',
   trafficN: 0, trafficKph: 50,
   trafficLanes: 3, trafficMixCar: 70, trafficMixTruck: 15, trafficMixMoto: 15
 };
@@ -2320,7 +2347,343 @@ var DriveCorePersist = (function(){
 
 var traffic = [];
 var trafficMeshes = [];
-var gpsState = { lat:40.4168, lon:-3.7038, alt:650, hdg:0 };
+var gpsState = { lat:40.4168, lon:-3.7038, alt:650, hdg:0, originLabel:'Madrid (por defecto)' };
+var GPS_ORIGINS = {
+  monza:  { lat:45.6216, lon:9.2811, alt:170, label:'Monza (aprox. meta)' },
+  spa:    { lat:50.4372, lon:5.9714, alt:400, label:'Spa-Francorchamps (aprox.)' },
+  madrid: { lat:40.3720, lon:-3.6900, alt:610, label:'Madrid / Madring (especulativo)' },
+  oval:   { lat:40.4168, lon:-3.7038, alt:650, label:'Óvalo local · origen Madrid' },
+  default:{ lat:40.4168, lon:-3.7038, alt:650, label:'Origen local · Madrid' }
+};
+function setGpsOrigin(key){
+  var o = GPS_ORIGINS[key] || GPS_ORIGINS.default;
+  vehicle.gpsLat0 = o.lat; vehicle.gpsLon0 = o.lon; vehicle.gpsAlt0 = o.alt;
+  vehicle.gpsOriginLabel = o.label;
+  gpsState.lat = o.lat; gpsState.lon = o.lon; gpsState.alt = o.alt;
+  gpsState.originLabel = o.label; gpsState.hdg = 0;
+  gpsState.latMeas = o.lat; gpsState.lonMeas = o.lon;
+  gpsState.errM = 0; gpsState.hdop = 1.2;
+  if (typeof ImuSim !== 'undefined' && ImuSim.reset) ImuSim.reset();
+  if (typeof SensFusion !== 'undefined' && SensFusion.reset) SensFusion.reset();
+  if (typeof KalmanEN !== 'undefined' && KalmanEN.reset) KalmanEN.reset();
+  if (typeof VoSlam !== 'undefined' && VoSlam.reset) VoSlam.reset();
+  if (typeof EkfSlam !== 'undefined' && EkfSlam.reset) EkfSlam.reset();
+  if (typeof ParticleLoc !== 'undefined' && ParticleLoc.reset) ParticleLoc.reset();
+}
+var ImuSim = {
+  yaw: 0, biasR: 0.004, walkN: 0, walkE: 0,
+  axBody: 0, ayBody: 0, rMeas: 0,
+  biasRHat: 0, axBiasHat: 0, ayBiasHat: 0,
+  calN: 0, calSumR: 0, calSumAx: 0, calSumAy: 0, calibrating: false,
+  reset: function(){
+    this.yaw = chassis.psi||0;
+    this.biasR = 0.003 + Math.random()*0.004;
+    this.walkN = 0; this.walkE = 0;
+    this.calibrating = false; this.calN = 0;
+  },
+  gauss: function(){
+    var u=Math.random()||1e-9, v=Math.random()||1e-9;
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  },
+  startCal: function(){
+    this.calibrating = true; this.calN = 0;
+    this.calSumR = 0; this.calSumAx = 0; this.calSumAy = 0;
+    if (typeof showToast==='function') showToast('IMU: calibrando ~2 s parado…');
+  },
+  step: function(dt){
+    if (dt<=0 || dt>0.2) dt=0.016;
+    var rTrue = chassis.r||0;
+    this.biasR += this.gauss()*0.0004*Math.sqrt(dt);
+    this.biasR = Math.max(-0.03, Math.min(0.03, this.biasR));
+    var rNoise = this.gauss()*0.02;
+    this.rMeas = rTrue + this.biasR + rNoise;
+    var aX = (chassis._axG||0)*9.81, aY = (chassis._ayG||0)*9.81;
+    this.axBody = aX + this.gauss()*0.35;
+    this.ayBody = aY + this.gauss()*0.35;
+    var v = Math.hypot(chassis.u||0, chassis.w||0);
+    if (this.calibrating){
+      if (v < 0.4){
+        this.calN++;
+        this.calSumR += this.rMeas;
+        this.calSumAx += this.axBody;
+        this.calSumAy += this.ayBody;
+        if (this.calN >= 120){
+          this.biasRHat = this.calSumR/this.calN;
+          this.axBiasHat = this.calSumAx/this.calN;
+          this.ayBiasHat = this.calSumAy/this.calN;
+          this.calibrating = false;
+          if (typeof showToast==='function') showToast('IMU calibrada · bias r='+(this.biasRHat*180/Math.PI).toFixed(2)+' °/s');
+        }
+      }
+    }
+    var rCorr = this.rMeas - (this.biasRHat||0);
+    this.yaw += rCorr * dt;
+    return this;
+  }
+};
+var KalmanEN = {
+  // Kalman lineal [E, N, vE, vN] con P 4×4 almacenada densa (16).
+  x: [0,0,0,0],
+  P: null,
+  I4: function(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; },
+  reset: function(){
+    this.x = [chassis.x||0, chassis.z||0, 0, 0];
+    this.P = [9,0,0,0, 0,9,0,0, 0,0,4,0, 0,0,0,4];
+  },
+  mul4: function(A,B){
+    var C=new Array(16), i,j,k,s;
+    for(i=0;i<4;i++) for(j=0;j<4;j++){
+      s=0; for(k=0;k<4;k++) s+=A[i*4+k]*B[k*4+j]; C[i*4+j]=s;
+    }
+    return C;
+  },
+  add4: function(A,B){ var C=new Array(16),i; for(i=0;i<16;i++) C[i]=A[i]+B[i]; return C; },
+  tr4: function(A){
+    var C=new Array(16),i,j; for(i=0;i<4;i++) for(j=0;j<4;j++) C[i*4+j]=A[j*4+i]; return C;
+  },
+  ellipse: function(){
+    var a=this.P[0], b=this.P[1], c=this.P[5];
+    var tr=a+c, det=a*c-b*b, disc=Math.max(0, tr*tr/4-det);
+    var l1=tr/2+Math.sqrt(disc), l2=tr/2-Math.sqrt(disc);
+    var ang = Math.abs(b)>1e-9 ? 0.5*Math.atan2(2*b, a-c) : 0;
+    return { rx:Math.sqrt(Math.max(l1,1e-4))*2.0, ry:Math.sqrt(Math.max(l2,1e-4))*2.0, ang:ang, pe:a, pn:c, pen:b };
+  },
+  step: function(dt, gps){
+    if (!this.P) this.reset();
+    if (dt<=0 || dt>0.2) dt=0.016;
+    var yaw = (typeof SensFusion!=='undefined' && SensFusion.yaw) ? SensFusion.yaw : (chassis.psi||0);
+    var ax = ImuSim.axBody - (ImuSim.axBiasHat||0);
+    var ay = ImuSim.ayBody - (ImuSim.ayBiasHat||0);
+    var co=Math.cos(yaw), si=Math.sin(yaw);
+    var aE=ax*si+ay*co, aN=ax*co-ay*si;
+    // F ≈ [[1,0,dt,0],[0,1,0,dt],[0,0,1,0],[0,0,0,1]]
+    var F=[1,0,dt,0, 0,1,0,dt, 0,0,1,0, 0,0,0,1];
+    this.x[0]+=this.x[2]*dt; this.x[1]+=this.x[3]*dt;
+    this.x[2]+=aE*dt; this.x[3]+=aN*dt;
+    var Ft=this.tr4(F);
+    var Q=[0.15*dt,0,0,0, 0,0.15*dt,0,0, 0,0,0.8*dt,0, 0,0,0,0.8*dt];
+    this.P = this.add4(this.mul4(this.mul4(F,this.P),Ft), Q);
+    if (gps.eastMeas!=null){
+      var r = Math.max(1.2, (gps.hdop||1)*2.2);
+      var R = r*r;
+      // update E (índice 0)
+      var S0 = this.P[0]+R, K0=this.P[0]/S0, K2=this.P[8]/S0;
+      var inn0 = gps.eastMeas-this.x[0];
+      this.x[0]+=K0*inn0; this.x[2]+=K2*inn0;
+      // P := (I-KH)P  H=[1,0,0,0]
+      var i,j;
+      var KH=[K0,0,0,0, 0,0,0,0, K2,0,0,0, 0,0,0,0];
+      var IKH=this.I4();
+      for(i=0;i<16;i++) IKH[i]-=KH[i];
+      this.P=this.mul4(IKH,this.P);
+      var S1=this.P[5]+R, K1=this.P[5]/S1, K3=this.P[13]/S1;
+      var inn1=gps.northMeas-this.x[1];
+      this.x[1]+=K1*inn1; this.x[3]+=K3*inn1;
+      KH=[0,0,0,0, 0,K1,0,0, 0,0,0,0, 0,K3,0,0];
+      IKH=this.I4();
+      for(i=0;i<16;i++) IKH[i]-=KH[i];
+      this.P=this.mul4(IKH,this.P);
+    }
+    gps.eastKf=this.x[0]; gps.northKf=this.x[1];
+    gps.kfErrM=Math.hypot(this.x[0]-(chassis.x||0), this.x[1]-(chassis.z||0));
+    var el=this.ellipse();
+    gps.kfPe=el.pe; gps.kfPn=el.pn; gps.kfPen=el.pen;
+    gps.kfRx=el.rx; gps.kfRy=el.ry; gps.kfAng=el.ang;
+    gps.kfP=Math.sqrt(Math.max(0,el.pe+el.pn));
+  }
+};
+var EkfSlam = {
+  // EKF-SLAM mínimo: estado robot [E,N,ψ] + 3 hitos fijos (sectores).
+  // Los hitos se inicializan en las marcas de sector del TRACK. No es ORB-SLAM.
+  x: [0,0,0], Pdiag: [2,2,0.05],
+  lm: [],
+  reset: function(){
+    this.x = [chassis.x||0, chassis.z||0, chassis.psi||0];
+    this.Pdiag = [2,2,0.05];
+    this.lm = [];
+    if (TRACK.segs.length){
+      for (var i=0;i<3;i++){
+        var p = TRACK.pointAtS(TRACK.totalLength*(i/3));
+        this.lm.push({e:p.x, n:p.z, Pe:9, Pn:9});
+      }
+    }
+  },
+  wrap: function(a){ return Math.atan2(Math.sin(a), Math.cos(a)); },
+  step: function(dt, gps){
+    if (dt<=0 || dt>0.2) dt=0.016;
+    var u = chassis.u||0, r = chassis.r||0;
+    this.x[2] = this.wrap(this.x[2] + r*dt);
+    this.x[0] += u*Math.sin(this.x[2])*dt;
+    this.x[1] += u*Math.cos(this.x[2])*dt;
+    this.Pdiag[0] += 0.3*dt; this.Pdiag[1] += 0.3*dt; this.Pdiag[2] += 0.01*dt;
+    if (gps.eastMeas!=null){
+      var rg = Math.max(2, (gps.hdop||1)*2.2); var rg2=rg*rg;
+      var Ke = this.Pdiag[0]/(this.Pdiag[0]+rg2);
+      var Kn = this.Pdiag[1]/(this.Pdiag[1]+rg2);
+      this.x[0] += Ke*(gps.eastMeas-this.x[0]);
+      this.x[1] += Kn*(gps.northMeas-this.x[1]);
+      this.Pdiag[0]*=(1-Ke); this.Pdiag[1]*=(1-Kn);
+    }
+    // rango-rumbo a hitos (medida = geometría verdadera + ruido)
+    var i, lm, de, dn, rng, bear, rngM, bearM, Kr;
+    for (i=0;i<this.lm.length;i++){
+      lm = this.lm[i];
+      de = lm.e - this.x[0]; dn = lm.n - this.x[1];
+      rng = Math.hypot(de,dn) || 1;
+      bear = this.wrap(Math.atan2(de,dn) - this.x[2]);
+      rngM = rng + (Math.random()-0.5)*2.0;
+      bearM = bear + (Math.random()-0.5)*0.04;
+      Kr = lm.Pe / (lm.Pe + 4);
+      lm.e += Kr * (this.x[0] + rngM*Math.sin(this.x[2]+bearM) - lm.e);
+      lm.n += Kr * (this.x[1] + rngM*Math.cos(this.x[2]+bearM) - lm.n);
+      lm.Pe *= (1-Kr*0.5); lm.Pn *= (1-Kr*0.5);
+    }
+    gps.eastEkf = this.x[0]; gps.northEkf = this.x[1];
+    gps.ekfErrM = Math.hypot(this.x[0]-(chassis.x||0), this.x[1]-(chassis.z||0));
+  }
+};
+var ParticleLoc = {
+  // Localización Monte-Carlo en el plano. N=60. Peso ∝ exp(-d_GPS²) y dist. a pista.
+  N: 60, parts: [],
+  reset: function(){
+    this.parts = [];
+    for (var i=0;i<this.N;i++){
+      this.parts.push({
+        e: (chassis.x||0)+(Math.random()-0.5)*8,
+        n: (chassis.z||0)+(Math.random()-0.5)*8,
+        yaw: (chassis.psi||0)+(Math.random()-0.5)*0.3,
+        w: 1
+      });
+    }
+  },
+  step: function(dt, gps){
+    if (!this.parts.length) this.reset();
+    var i, p, u=chassis.u||0, r=chassis.r||0, wsum=0;
+    for (i=0;i<this.parts.length;i++){
+      p = this.parts[i];
+      p.yaw += r*dt + (Math.random()-0.5)*0.02;
+      p.e += (u*Math.sin(p.yaw))*dt + (Math.random()-0.5)*0.15;
+      p.n += (u*Math.cos(p.yaw))*dt + (Math.random()-0.5)*0.15;
+      var dGps = 0;
+      if (gps.eastMeas!=null) dGps = Math.hypot(p.e-gps.eastMeas, p.n-gps.northMeas);
+      var dTrack = 0;
+      if (TRACK.segs.length && TRACK.projectOntoTrack){
+        var pr = TRACK.projectOntoTrack(p.e, p.n);
+        dTrack = pr && pr.dist!=null ? pr.dist : 0;
+      }
+      p.w = Math.exp(-0.08*dGps*dGps - 0.02*dTrack*dTrack) + 1e-9;
+      wsum += p.w;
+    }
+    var e=0,n=0;
+    for (i=0;i<this.parts.length;i++){
+      this.parts[i].w /= wsum;
+      e += this.parts[i].e * this.parts[i].w;
+      n += this.parts[i].n * this.parts[i].w;
+    }
+    // resample multinomial ligero si Neff bajo
+    var neff=0;
+    for (i=0;i<this.parts.length;i++) neff += this.parts[i].w*this.parts[i].w;
+    neff = 1/Math.max(neff,1e-9);
+    if (neff < this.N*0.4){
+      var cdf=[], acc=0;
+      for (i=0;i<this.parts.length;i++){ acc+=this.parts[i].w; cdf.push(acc); }
+      var neu=[];
+      for (i=0;i<this.N;i++){
+        var u2=Math.random(), j=0;
+        while (j<cdf.length-1 && cdf[j]<u2) j++;
+        var src=this.parts[j];
+        neu.push({e:src.e+(Math.random()-0.5)*0.4, n:src.n+(Math.random()-0.5)*0.4, yaw:src.yaw, w:1});
+      }
+      this.parts = neu;
+    }
+    gps.eastPf = e; gps.northPf = n;
+    gps.pfErrM = Math.hypot(e-(chassis.x||0), n-(chassis.z||0));
+    gps.pfNeff = neff;
+  }
+};
+var VoSlam = {
+  // Odometría visual simulada: no hay cámara ni descriptores.
+  // Integra v del chasis con deriva de escala y yaw; "cierre de lazo"
+  // cuando s cruza meta (s pequeño tras haber sido grande).
+  e: 0, n: 0, yaw: 0, scale: 1, lastS: 0, loops: 0,
+  reset: function(){
+    this.e = chassis.x||0; this.n = chassis.z||0;
+    this.yaw = chassis.psi||0; this.scale = 1 + (Math.random()-0.5)*0.04;
+    this.lastS = 0; this.loops = 0;
+  },
+  step: function(dt, gps){
+    if (dt<=0 || dt>0.2) dt=0.016;
+    this.scale += (Math.random()-0.5)*0.00015;
+    this.scale = Math.max(0.92, Math.min(1.08, this.scale));
+    this.yaw += (chassis.r||0)*dt + (Math.random()-0.5)*0.004;
+    var u = (chassis.u||0)*this.scale, w = (chassis.w||0)*this.scale;
+    this.e += (u*Math.sin(this.yaw) + w*Math.cos(this.yaw))*dt;
+    this.n += (u*Math.cos(this.yaw) - w*Math.sin(this.yaw))*dt;
+    var s = chassis._trackProj ? chassis._trackProj.s : 0;
+    if (this.lastS > 80 && s < 25 && TRACK.totalLength>100){
+      this.loops++;
+      var a = 0.35;
+      this.e = this.e*(1-a) + (chassis.x||0)*a;
+      this.n = this.n*(1-a) + (chassis.z||0)*a;
+      this.yaw = this.yaw*(1-a) + (chassis.psi||0)*a;
+      this.scale = this.scale*0.7 + 0.3;
+    }
+    this.lastS = s;
+    gps.eastVo = this.e; gps.northVo = this.n;
+    gps.voErrM = Math.hypot(this.e-(chassis.x||0), this.n-(chassis.z||0));
+    gps.voLoops = this.loops;
+    gps.voScale = this.scale;
+  }
+};
+var SensFusion = {
+  // Complementario + 1 estado de bias. No es EKF de 15 estados ni INS.
+  yaw: 0, east: 0, north: 0, ve: 0, vn: 0,
+  alphaYaw: 0.02, alphaPos: 0.08,
+  reset: function(){
+    this.yaw = chassis.psi||0;
+    this.east = chassis.x||0; this.north = chassis.z||0;
+    this.ve = 0; this.vn = 0;
+  },
+  wrapPi: function(a){ return Math.atan2(Math.sin(a), Math.cos(a)); },
+  step: function(dt, gps){
+    if (dt<=0 || dt>0.2) dt=0.016;
+    var rCorr = ImuSim.rMeas - (ImuSim.biasRHat||0);
+    this.yaw = this.wrapPi(this.yaw + rCorr*dt);
+    var v = gps.v||0;
+    if (v > 3){
+      var course = Math.atan2(chassis.u*Math.sin(chassis.psi)+chassis.w*Math.cos(chassis.psi),
+                              chassis.u*Math.cos(chassis.psi)-chassis.w*Math.sin(chassis.psi));
+      // rumbo GPS ≈ curso sobre el suelo (verdad+ruido de velocidad nula aquí)
+      var yawGps = chassis.psi + ImuSim.gauss()*0.04;
+      this.yaw = this.wrapPi(this.yaw + this.alphaYaw * this.wrapPi(yawGps - this.yaw));
+    }
+    var ax = ImuSim.axBody - (ImuSim.axBiasHat||0);
+    var ay = ImuSim.ayBody - (ImuSim.ayBiasHat||0);
+    var c = Math.cos(this.yaw), si = Math.sin(this.yaw);
+    var aE = ax*si + ay*c;
+    var aN = ax*c - ay*si;
+    this.ve += aE*dt; this.vn += aN*dt;
+    this.east += this.ve*dt; this.north += this.vn*dt;
+    var eGps = gps.eastMeas, nGps = gps.northMeas;
+    if (eGps!=null && nGps!=null){
+      var a = this.alphaPos;
+      this.east += a*(eGps - this.east);
+      this.north += a*(nGps - this.north);
+      this.ve *= (1-0.15*a); this.vn *= (1-0.15*a);
+    }
+    gps.yawFus = ((this.yaw*180/Math.PI)+360)%360;
+    gps.eastFus = this.east; gps.northFus = this.north;
+    gps.fusErrM = Math.hypot(this.east-(chassis.x||0), this.north-(chassis.z||0));
+  }
+};
+function guessTrackOriginKey(){
+  var L = TRACK.totalLength||0;
+  if (Math.abs(L-5773)<80 || Math.abs(L-5774)<80) return 'monza';
+  if (L>6400 && L<7400) return 'spa';
+  if (L>5000 && L<5600) return 'madrid';
+  if (L>400 && L<700) return 'oval';
+  return 'default';
+}
 /* AeroModel: única fuente de verdad, usada tanto por el simulador en vivo
    como por el módulo exportable (buildEngineSource la reutiliza vía
    toString(), no la reescribe a mano). */
@@ -2614,6 +2977,10 @@ function notifyTrackChanged(){
     if (RaceLabPlan.redraw) RaceLabPlan.redraw();
   }
   if (typeof RaceLabGrid !== 'undefined') RaceLabGrid.clear(true);
+  if (typeof setGpsOrigin === 'function'){
+    setGpsOrigin(guessTrackOriginKey());
+    trackMinimapCache.totalLength = -1;
+  }
 }
 function loadTrackPreset(name){
   notifyTrackChanged();
@@ -2965,17 +3332,47 @@ function nearestLead(){
   return best;
 }
 function updateGPS(dt){
-  var v = Math.hypot(chassis.u||0, chassis.w||0);
-  var hdg = chassis.psi || 0; // 0 = +Z north-ish
-  var north = v * Math.cos(hdg);
-  var east  = v * Math.sin(hdg);
+  ImuSim.step(dt);
+  var lat0 = vehicle.gpsLat0 || 40.4168;
+  var lon0 = vehicle.gpsLon0 || -3.7038;
   var mLat = 111320;
-  var mLon = 111320 * Math.cos((gpsState.lat||40)*Math.PI/180);
-  gpsState.lat += north * dt / mLat;
-  gpsState.lon += east * dt / mLon;
-  gpsState.hdg = (hdg*180/Math.PI + 360) % 360;
-  gpsState.alt = (vehicle.gpsAlt0||650) + (chassis.zS||0) + (vehicle.slopeLongDeg||0)*0.2;
-  gpsState.v = v;
+  var mLon = 111320 * Math.max(0.2, Math.cos(lat0*Math.PI/180));
+  // Verdad de terreno en ENU local: X=este, Z=norte (metros).
+  var eastTrue = chassis.x||0, northTrue = chassis.z||0;
+  gpsState.lat = lat0 + northTrue / mLat;
+  gpsState.lon = lon0 + eastTrue / mLon;
+  gpsState.hdg = (((chassis.psi||0)*180/Math.PI)+360)%360;
+  gpsState.hdgImu = ((ImuSim.yaw*180/Math.PI)+360)%360;
+  gpsState.yawErrDeg = ((gpsState.hdgImu - gpsState.hdg + 540)%360) - 180;
+  var elev = 0;
+  if (TRACK.segs.length && typeof TRACK.pointAtS === 'function'){
+    var sNow = chassis._trackProj ? chassis._trackProj.s : 0;
+    var pt = TRACK.pointAtS(sNow);
+    if (pt && pt.elev != null) elev = pt.elev;
+  }
+  gpsState.alt = (vehicle.gpsAlt0||650) + elev + (chassis.zS||0);
+  gpsState.v = Math.hypot(chassis.u||0, chassis.w||0);
+
+  // Error GPS: ruido blanco + random walk + HDOP. No es un receptor.
+  var hdop = 0.9 + 0.6*Math.abs(Math.sin((performance.now()||0)/18000));
+  if (!vehicleRunning) hdop = 1.4;
+  ImuSim.walkE += ImuSim.gauss()*0.08*Math.sqrt(Math.max(dt,1e-3));
+  ImuSim.walkN += ImuSim.gauss()*0.08*Math.sqrt(Math.max(dt,1e-3));
+  ImuSim.walkE *= 0.999; ImuSim.walkN *= 0.999;
+  var sigma = 2.2 * hdop; // m, 1σ horizontal
+  var eE = ImuSim.walkE + ImuSim.gauss()*sigma;
+  var eN = ImuSim.walkN + ImuSim.gauss()*sigma;
+  gpsState.eastMeas = eastTrue + eE;
+  gpsState.northMeas = northTrue + eN;
+  gpsState.latMeas = lat0 + gpsState.northMeas / mLat;
+  gpsState.lonMeas = lon0 + gpsState.eastMeas / mLon;
+  gpsState.errM = Math.hypot(eE, eN);
+  gpsState.hdop = hdop;
+  SensFusion.step(dt, gpsState);
+  KalmanEN.step(dt, gpsState);
+  VoSlam.step(dt, gpsState);
+  EkfSlam.step(dt, gpsState);
+  ParticleLoc.step(dt, gpsState);
 }
 function drawGPSMap(){
   var c = document.getElementById('gpsMap');
@@ -3033,7 +3430,7 @@ function buildTrackMinimapCache(w, h){
   var scale = Math.min((w-2*pad)/spanX, (h-2*pad)/spanZ);
   trackMinimapCache = {
     totalLength: TRACK.totalLength, points: pts, scale: scale,
-    offX: pad + maxX*scale + (w-2*pad-spanX*scale)/2,
+    offX: pad - minX*scale + (w-2*pad-spanX*scale)/2,
     offY: pad - minZ*scale + (h-2*pad-spanZ*scale)/2
   };
 }
@@ -3042,10 +3439,8 @@ function drawTrackMinimap(ctx, w, h){
     buildTrackMinimapCache(w, h);
   }
   var cache = trackMinimapCache;
-  // X invertido a propósito: en una vista cenital norte-arriba, girar a la
-  // izquierda de verdad (psi positivo, comprobado con la física real) debe
-  // curvar hacia la izquierda de la pantalla, no hacia la derecha.
-  function toPx(x, z){ return { px: -x*cache.scale + cache.offX, py: h - (z*cache.scale + cache.offY) }; }
+  // Misma convención que RaceLabPlan: +X derecha, +Z arriba.
+  function toPx(x, z){ return { px: x*cache.scale + cache.offX, py: h - (z*cache.scale + cache.offY) }; }
 
   // Trazado completo
   ctx.strokeStyle = '#4ecdc4';
@@ -3069,7 +3464,47 @@ function drawTrackMinimap(ctx, w, h){
     ctx.beginPath(); ctx.arc(p.px, p.py, 2.5, 0, Math.PI*2); ctx.fill();
   });
 
-  // Coche: posición real (puede estar fuera de la línea si te sales de pista)
+  if (gpsState.eastMeas!=null){
+    var g = toPx(gpsState.eastMeas, gpsState.northMeas);
+    ctx.strokeStyle = 'rgba(120,200,255,0.9)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(g.px, g.py, 6, 0, Math.PI*2); ctx.stroke();
+  }
+  if (gpsState.eastFus!=null){
+    var f = toPx(gpsState.eastFus, gpsState.northFus);
+    ctx.fillStyle = '#c9a0ff';
+    ctx.beginPath(); ctx.arc(f.px, f.py, 3.5, 0, Math.PI*2); ctx.fill();
+  }
+  if (gpsState.eastKf!=null){
+    var k = toPx(gpsState.eastKf, gpsState.northKf);
+    if (gpsState.kfRx){
+      ctx.save();
+      ctx.translate(k.px, k.py);
+      ctx.rotate(-(gpsState.kfAng||0));
+      ctx.strokeStyle = 'rgba(124,255,178,0.7)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, Math.min(40, gpsState.kfRx*cache.scale), Math.min(40, gpsState.kfRy*cache.scale), 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#7cffb2';
+    ctx.beginPath(); ctx.arc(k.px, k.py, 3, 0, Math.PI*2); ctx.fill();
+  }
+  if (gpsState.eastVo!=null){
+    var vo = toPx(gpsState.eastVo, gpsState.northVo);
+    ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 1;
+    ctx.strokeRect(vo.px-3, vo.py-3, 6, 6);
+  }
+  if (gpsState.eastEkf!=null){
+    var ek = toPx(gpsState.eastEkf, gpsState.northEkf);
+    ctx.fillStyle = '#ff6b9a';
+    ctx.beginPath(); ctx.arc(ek.px, ek.py, 3, 0, Math.PI*2); ctx.fill();
+  }
+  if (gpsState.eastPf!=null){
+    var pf = toPx(gpsState.eastPf, gpsState.northPf);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(pf.px, pf.py, 5, 0, Math.PI*2); ctx.stroke();
+  }
   var me = toPx(chassis.x, chassis.z);
   ctx.fillStyle = (chassis._onTrack === false) ? '#ff6b6b' : '#e8a54b';
   ctx.save();
@@ -3079,7 +3514,11 @@ function drawTrackMinimap(ctx, w, h){
   ctx.restore();
 
   ctx.fillStyle = '#8899bb'; ctx.font = '10px monospace';
-  ctx.fillText('vuelta ' + (TRACK.totalLength ? ((chassis._trackProj ? (chassis._trackProj.s/TRACK.totalLength*100).toFixed(0) : '0') + '%') : ''), 6, h-6);
+  var pct = TRACK.totalLength ? ((chassis._trackProj ? (chassis._trackProj.s/TRACK.totalLength*100).toFixed(0) : '0') + '%') : '';
+  ctx.fillText('s ' + pct + ' · N↑ X→', 6, h-6);
+  ctx.fillStyle = '#c9b496';
+  ctx.fillText('N', w-14, 14);
+  ctx.fillText('E', w-14, h-8);
 }
 function syncTrafficMeshes(){
   if (!scene4w) return;
@@ -3171,10 +3610,60 @@ function updateTelemetry(){
   set('telRpm', (vehicle.omegaE||0)*60/(2*Math.PI) > 200 ? ((vehicle.omegaE)*60/(2*Math.PI)).toFixed(0) : '—');
   set('telGear', gearLabel(currentGear()));
   set('telTtc', (chassis._ttc||99)>20 ? '—' : (chassis._ttc).toFixed(1));
-  set('telLat', gpsState.lat.toFixed(6));
-  set('telLon', gpsState.lon.toFixed(6));
+  set('telX', (chassis.x||0).toFixed(1));
+  set('telZ', (chassis.z||0).toFixed(1));
+  set('telLat', (gpsState.latMeas!=null?gpsState.latMeas:gpsState.lat).toFixed(6));
+  set('telLon', (gpsState.lonMeas!=null?gpsState.lonMeas:gpsState.lon).toFixed(6));
   set('telHdg', gpsState.hdg.toFixed(0));
-  set('telAlt', gpsState.alt.toFixed(0));
+  set('telHdgImu', (gpsState.hdgImu!=null?gpsState.hdgImu:gpsState.hdg).toFixed(0));
+  set('telGpsErr', (gpsState.errM||0).toFixed(1));
+  set('telHdop', (gpsState.hdop||1).toFixed(2));
+  set('telYawFus', (gpsState.yawFus!=null?gpsState.yawFus:gpsState.hdg).toFixed(0));
+  set('telFusErr', (gpsState.fusErrM||0).toFixed(1));
+  set('telKfErr', (gpsState.kfErrM||0).toFixed(1));
+  set('telKfP', (gpsState.kfPe!=null) ? (Math.sqrt(Math.max(0,gpsState.kfPe)).toFixed(1)+','+Math.sqrt(Math.max(0,gpsState.kfPn)).toFixed(1)) : '—');
+  set('telVoErr', (gpsState.voErrM||0).toFixed(1));
+  set('telEkfErr', (gpsState.ekfErrM||0).toFixed(1));
+  set('telPfErr', (gpsState.pfErrM||0).toFixed(1));
+  var fusLive = document.getElementById('fusLive');
+  if (fusLive){
+    fusLive.textContent =
+      'verdad X=' + (chassis.x||0).toFixed(1) + ' Z=' + (chassis.z||0).toFixed(1) +
+      '  · GPS X=' + (gpsState.eastMeas||0).toFixed(1) + ' Z=' + (gpsState.northMeas||0).toFixed(1) +
+      '  · fus X=' + (gpsState.eastFus||0).toFixed(1) + ' Z=' + (gpsState.northFus||0).toFixed(1) +
+      '  · ψ ' + (gpsState.hdg||0).toFixed(0) + ' / IMU ' + (gpsState.hdgImu||0).toFixed(0) +
+      ' / fus ' + (gpsState.yawFus||0).toFixed(0) +
+      '  · |e| GPS=' + (gpsState.errM||0).toFixed(1) +
+      ' fus=' + (gpsState.fusErrM||0).toFixed(1) +
+      ' KF=' + (gpsState.kfErrM||0).toFixed(1) +
+      ' P=[' + (gpsState.kfPe!=null?Math.sqrt(Math.max(0,gpsState.kfPe)).toFixed(1):'?') +
+      ',' + (gpsState.kfPn!=null?Math.sqrt(Math.max(0,gpsState.kfPn)).toFixed(1):'?') + ']'+
+      ' VO=' + (gpsState.voErrM||0).toFixed(1) +
+      ' EKF=' + (gpsState.ekfErrM||0).toFixed(1) +
+      ' PF=' + (gpsState.pfErrM||0).toFixed(1) +
+      ' m  · Neff=' + (gpsState.pfNeff||0).toFixed(0) +
+      '  VO lazos=' + (gpsState.voLoops||0);
+  }
+  if (!window._fusErrHist) window._fusErrHist = [];
+  window._fusErrHist.push(gpsState.fusErrM||0);
+  if (window._fusErrHist.length > 80) window._fusErrHist.shift();
+  var fc = document.getElementById('fusErrChart');
+  if (fc && fc.getContext){
+    var fctx = fc.getContext('2d');
+    var fw = fc.width, fh = fc.height;
+    fctx.fillStyle = '#16120e'; fctx.fillRect(0,0,fw,fh);
+    var arr = window._fusErrHist, mx = 1;
+    for (var fi=0; fi<arr.length; fi++) if (arr[fi]>mx) mx=arr[fi];
+    fctx.strokeStyle = '#c9a0ff'; fctx.lineWidth = 1.5; fctx.beginPath();
+    for (var fj=0; fj<arr.length; fj++){
+      var px = fj/(Math.max(1,arr.length-1))*fw;
+      var py = fh - 4 - (arr[fj]/mx)*(fh-8);
+      if (fj===0) fctx.moveTo(px,py); else fctx.lineTo(px,py);
+    }
+    fctx.stroke();
+    fctx.fillStyle = '#b7a48a'; fctx.font = '10px sans-serif';
+    fctx.fillText('|e| fusión m  max '+mx.toFixed(1), 6, 12);
+  }
   set('telAero', (chassis._aeroN||0).toFixed(0));
   var slopeNowT = currentSlopeDeg();
   set('telSlope', slopeNowT.longDeg.toFixed(1) + '/' + slopeNowT.latDeg.toFixed(1));
@@ -5538,6 +6027,10 @@ function bindVehicleControls(){
     var c = document.getElementById('btnTrackClear');
     if (c) c.click();
   });
+  var btnImuCal = document.getElementById('btnImuCal');
+  if (btnImuCal) btnImuCal.addEventListener('click', function(){
+    if (typeof ImuSim !== 'undefined') ImuSim.startCal();
+  });
   var btnEsses = document.getElementById('btnTrackEsses');
   if (btnEsses) btnEsses.addEventListener('click', function(){ loadPresetIntoUI('esses'); });
   var btnLoad = document.getElementById('btnTrackLoad');
@@ -6235,7 +6728,7 @@ var I18N = {
   es: {
     help_btn:'❓ Ayuda', help_close:'Cerrar ayuda', theme_dark:'🌙 Oscuro', theme_light:'☀️ Claro',
     export:'📦 Motor JS', sub:'Cerda Dahl–Stribeck · rampa · ABS/TCS · ADAS · tráfico',
-    sec_tele:'Telemetría + GPS', sec_traf:'Tráfico', tl_gear:'marcha', tl_hdg:'rumbo °',
+    sec_tele:'Telemetría + GPS simulado', sec_traf:'Tráfico', tl_gear:'marcha', tl_hdg:'ψ ° (0=+Z)',
     traf_n:'N.º coches', traf_v:'Vel. tráfico', traf_add:'+ coche', traf_clr:'Vaciar', traf_test:'Test tráfico',
     running:'simulando', empty_traf:'Sin tráfico'
   },
@@ -9037,7 +9530,7 @@ var RaceLabPlan = (function(){
       if(stHov){
         var Rtxt=Math.abs(stHov.curvature)>1e-6?(1/Math.abs(stHov.curvature)).toFixed(1):'∞';
         info.style.display='block';
-        info.innerHTML='s='+hoverS.toFixed(0)+'m<br>R='+Rtxt+'m<br>peralte='+(stHov.bankDeg||0).toFixed(1)+'°';
+        info.innerHTML='s='+hoverS.toFixed(0)+' m<br>R='+Rtxt+' m · peralte='+(stHov.bankDeg||0).toFixed(1)+'°<br>+X este · +Z norte';
       }
     } else if(info) info.style.display='none';
     } catch(eDraw){ console.warn('RaceLabPlan.draw', eDraw); }
