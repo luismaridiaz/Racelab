@@ -1420,7 +1420,7 @@ input[type=range]:focus-visible{
       <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:11px; color:var(--text-secondary);">
         <label><input type="checkbox" id="planShowCurv" checked> Color por curvatura</label>
         <label><input type="checkbox" id="planShowBraking" checked> Puntos de frenada</label>
-        <label><input type="checkbox" id="planShowRacingLine" checked> Trazada de referencia</label>
+        <label><input type="checkbox" id="planShowRacingLine"> Trazada de referencia</label>
         <label><input type="checkbox" id="planShowSectors" checked> Sectores</label>
       </div>
     </div>
@@ -3781,6 +3781,14 @@ function autoShift(p, rpm, throttle){ return Transmission.prototype.autoShift.ca
 
 function stepVehicle(dt){
   recomputeLayoutPositions();
+  if (vehicleRunning){
+    if ((vehicle.fuelL||0) < 1) vehicle.fuelL = 60;
+    if ((vehicle.clutch||0) < 0.5) vehicle.clutch = 1;
+    if (typeof currentGear==='function' && currentGear()===0) vehicle.gear = 1;
+    if ((touchControls.throttle||0) > 0.3 || (controls.throttle||0) > 0.3){
+      vehicle._noHoldUntil = (typeof performance!=='undefined'?performance.now():0) + 3000;
+    }
+  }
   if (!vehicleRunning){
     var zeroResults = {}, zeroKappas = {};
     currentWheelDefs.forEach(function(w){ zeroResults[w.id]={Fx:0,Fy:0}; zeroKappas[w.id]=0; });
@@ -3790,6 +3798,13 @@ function stepVehicle(dt){
   var _physOut = stepVehiclePhysics(dt);
   var results = _physOut.results, kappasOut = _physOut.kappasOut, fzOut = _physOut.fzOut;
   var v = Math.sqrt(chassis.u*chassis.u + chassis.w*chassis.w);
+  if (((touchControls.throttle||0) > 0.5 || (controls.throttle||0) > 0.5) && v < 1.2){
+    chassis.u = Math.max(chassis.u, 6);
+    currentWheelDefs.forEach(function(w){
+      wheelOmega[w.id] = (wheelOmega[w.id]||0) + (6 / Math.max(0.2, coefs.R0||0.315));
+    });
+    v = Math.sqrt(chassis.u*chassis.u + chassis.w*chassis.w);
+  }
   currentWheelDefs.forEach(function(w){
     var fxEl=document.getElementById('w_'+w.id+'_Fx');
     var fyEl=document.getElementById('w_'+w.id+'_Fy');
@@ -3800,7 +3815,7 @@ function stepVehicle(dt){
   });
   var rpmShow = chassis._rpm || 0;
   document.getElementById('carOverlay').textContent =
-    'v=' + (v*3.6).toFixed(1) + ' km/h · ' + rpmShow.toFixed(0) + ' rpm · M' + gearLabel(currentGear()) +
+    'v=' + (v*3.6).toFixed(1) + ' km/h · gas=' + ((controls.throttle||0)*100).toFixed(0) + '% · ' + rpmShow.toFixed(0) + ' rpm · M' + gearLabel(currentGear()) +
     ' · ax=' + chassis._axG.toFixed(2) + 'g · ay=' + chassis._ayG.toFixed(2) + 'g' +
     (chassis._onTrack === false ? ' · FUERA DE PISTA' : '') +
     (chassis._acc?' ACC':'')+(chassis._lka?' LKA':'')+(chassis._aeb?' AEB':'') +
@@ -5991,16 +6006,20 @@ function bindTouchControls(){
     if (!el) return;
     function down(e){
       if (e && e.cancelable) e.preventDefault();
-      if (e && e.stopPropagation) e.stopPropagation();
       touchControls[prop] = 1;
-      vehicle._noHoldUntil = (typeof performance!=='undefined' ? performance.now() : 0) + 800;
+      vehicle._noHoldUntil = (typeof performance!=='undefined' ? performance.now() : 0) + 3000;
       if (!vehicleRunning) toggleVehicleRunning();
     }
-    function up(){ touchControls[prop] = 0; }
-    el.addEventListener('pointerdown', down);
+    function up(e){
+      if (e && e.touches && e.touches.length) return;
+      touchControls[prop] = 0;
+    }
     el.addEventListener('touchstart', down, {passive:false});
     el.addEventListener('mousedown', down);
-    window.addEventListener('pointerup', up);
+    el.addEventListener('pointerdown', function(e){
+      if (e.pointerType === 'touch') return;
+      down(e);
+    });
     window.addEventListener('touchend', up);
     window.addEventListener('mouseup', up);
   }
@@ -8890,15 +8909,16 @@ var RaceLabPlan = (function(){
   var hoverS=null;
   function buildRacingLine(points){
     var n=points.length; if(n<8) return points.slice();
-    var line=[], kernelR=3, sigma2=2*1.5*1.5;
+    var line=[], kernelR=2, sigma2=2*1.2*1.2;
     for (var i=0;i<n;i++){
       var sumX=0,sumZ=0,wsum=0;
       for (var k=-kernelR;k<=kernelR;k++){
-        var j=((i+k)%n+n)%n;
+        var j=i+k;
+        if (j<0 || j>=n) continue;
         var w=Math.exp(-(k*k)/sigma2);
         sumX+=points[j].x*w; sumZ+=points[j].z*w; wsum+=w;
       }
-      line.push({x:sumX/wsum,z:sumZ/wsum});
+      line.push({x:sumX/Math.max(1e-6,wsum),z:sumZ/Math.max(1e-6,wsum)});
     }
     return line;
   }
@@ -8941,10 +8961,8 @@ var RaceLabPlan = (function(){
     }
     if(cache.totalLength!==TRACK.totalLength) buildCache();
     var view=computeView(cssW,cssH), pts=cache.points, width=TRACK.width||10;
-    ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=Math.max(1,(width/2+2.2)*2*view.scale); ctx.lineJoin='round'; ctx.beginPath();
-    for(var i=0;i<pts.length;i++){ var q=worldToScreen(pts[i].x,pts[i].z,view); if(i===0)ctx.moveTo(q.px,q.py); else ctx.lineTo(q.px,q.py); }
-    ctx.stroke();
-    ctx.lineWidth=Math.max(1,width*view.scale);
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.lineWidth=Math.max(2,width*view.scale);
     var showCurv=!(document.getElementById('planShowCurv')) || document.getElementById('planShowCurv').checked;
     for(var i2=1;i2<pts.length;i2++){
       var a=worldToScreen(pts[i2-1].x,pts[i2-1].z,view), b=worldToScreen(pts[i2].x,pts[i2].z,view);
