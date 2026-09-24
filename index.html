@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#16120e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>RaceLab — ingeniero de pista (motor científico, no arcade)</title>
+<title>RaceLab — ingeniero de pista (contacto Dahl/Stribeck verificable)</title>
 <script>
 /* Diagnóstico: si algo falla, lo muestra en la propia página en vez de
    dejarlo como un "Script error." genérico. Esto va ANTES que cualquier
@@ -43,13 +43,18 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 <style>
+@layer reset, tokens, base, components, racelab, overrides;
+@layer tokens {
+
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg-primary:#16120e;--bg-secondary:#221c16;--bg-card:#2a231c;--bg-input:#1a1511;
-  --text-primary:#f4ead8;--text-secondary:#b7a48a;--accent:#e8a54b;
-  --accent-glow:rgba(232,165,75,0.22);--border-color:#4a3b2a;
+  --bg-primary:#10141a;--bg-secondary:#171d26;--bg-card:#1c2430;--bg-input:#121820;
+  --text-primary:#e8eef6;--text-secondary:#8fa0b5;--accent:#3dcea8;
+  --accent-glow:rgba(61,206,168,0.22);--border-color:#2a3648;
   --shadow:0 10px 36px rgba(0,0,0,0.5);--radius:14px;--transition:0.2s ease;
   --chart-grid:#2a231c;--chart-tick:#b7a48a;--scene-bg:#16120e;
+  --ok:#4ecb71; --warn:#e8a54b; --danger:#c4472f; --info:#7cc8ff;
+  --chart-fx:#ff6b6b; --chart-fy:#4ecdc4; --chart-mz:#ffd93d;
 }
 :root[data-theme="light"]{
   --bg-primary:#f3ead9;--bg-secondary:#fffaf2;--bg-card:#efe4d0;--bg-input:#f7f0e4;
@@ -57,6 +62,9 @@
   --accent-glow:rgba(181,106,20,0.16);--border-color:#d7c4a4;
   --shadow:0 8px 28px rgba(80,50,20,0.12);--radius:12px;--transition:0.2s ease;
   --chart-grid:#e4d6bb;--chart-tick:#6d5a43;--scene-bg:#e8dcc6;
+  --ok:#3d8b55; --warn:#b56a14; --danger:#a33b2a; --info:#2a6f9a;
+  --chart-fx:#c4472f; --chart-fy:#2a8f88; --chart-mz:#b56a14;
+}
 }
 :root[data-theme="light"] .section-title{color:#6d5a43;border-bottom-color:#d7c4a4;}
 :root[data-theme="light"] select option{background:#fffaf2;color:#2a2118;}
@@ -103,22 +111,22 @@ select,textarea,input[type=number]{width:100%;padding:7px 10px;background:var(--
 textarea{min-height:160px;resize:vertical;}
 .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .btn{padding:9px 12px;border:none;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:var(--transition);}
-.btn-primary{background:linear-gradient(135deg,#e8a54b,#c45c12);color:#2a1608;}
+.btn-primary{background:linear-gradient(135deg,#3dcea8,#1e8f7a);color:#06221c;}
 .btn-secondary{background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border-color);}
-.btn-success{background:#6f9b4a;color:#fff;}
+.btn-success{background:#2a9a6e;color:#fff;}
 .btn-warning{background:#d4782a;color:#fff;}
 .btn-danger{background:#c4472f;color:#fff;}
 .btn:hover{filter:brightness(1.12);}
 .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .stat{background:var(--bg-input);border-radius:8px;padding:10px 12px;border:1px solid var(--border-color);text-align:center;}
-.stat .val{font-size:19px;font-weight:700;font-family:Menlo,Consolas,monospace;color:var(--accent);}
+.stat .val{font-size:clamp(18px,1.8vw + 12px,26px);font-weight:700;font-family:Menlo,Consolas,monospace;color:var(--accent);}
 .stat .lbl{font-size:10px;text-transform:uppercase;color:var(--text-secondary);margin-top:2px;}
 .fx{color:#ff6b6b;}.fy{color:#4ecdc4;}.mz{color:#ffd93d;}
 .canvas3d{background:var(--bg-primary);border-radius:var(--radius);border:1px solid var(--border-color);height:300px;position:relative;overflow:hidden;touch-action:none;cursor:grab;}
 .canvas3d #three-canvas, .canvas3d #three-canvas-4w{width:100%;height:100%;background:var(--bg-primary);display:block;}
-#trackPlanView{background:#16120e;max-width:100%;height:200px;}
+#trackPlanView{background:#0c1016;max-width:100%;height:280px;}
 @media (max-width:720px){
-  #trackPlanView{height:160px !important;}
+  #trackPlanView{height:200px !important;}
 }
 canvas{background:transparent;}
 @media (max-width:720px){
@@ -129,8 +137,6 @@ canvas{background:transparent;}
 .skip-link:focus{top:8px;}
 button, input[type="range"], select{min-height:44px;}
 .lang-switch button{min-height:36px;min-width:44px;}
-body[data-level="drive"] .level-adjust, body[data-level="drive"] .level-lab{display:none !important;}
-body[data-level="adjust"] .level-lab{display:none !important;}
 .search-hidden{display:none !important;}
 .level-card[aria-pressed="true"]{
   background:var(--accent);
@@ -572,6 +578,144 @@ input[type=range]:focus-visible{
   color:var(--text-primary);
   background:var(--bg-input);
 }
+
+/* RaceLab pista — identidad sobre el banco */
+:root{
+  --ok:#4ecb71; --warn:#e8a54b; --danger:#c4472f; --info:#7cc8ff;
+}
+/* UI de nivel: ⚙ Setup → Conducir/Ajustar/Laboratorio. Este bloque queda fuera de flujo. */
+#levelSelector{display:none;}
+.header{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px 16px;
+  align-items:center;
+  padding:8px 12px;
+  background:#10141a;
+  border-bottom:1px solid var(--border-color);
+}
+.header .brand h1{font-size:clamp(14px,2vw,18px); letter-spacing:0.08em; text-transform:uppercase;}
+.header .brand .sub{display:none;}
+.header .status{display:none;}
+.header .status .dot{display:none;}
+#sessionBar{ display:none; }
+
+#hudStrip{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px 8px;
+  padding:8px 10px;
+  background:linear-gradient(180deg,#1a2330,#10141a);
+  border-bottom:1px solid var(--border-color);
+  font-family:Menlo,Consolas,monospace;
+  font-size:12px;
+}
+#hudStrip .btn{
+  padding:6px 10px;
+  min-height:36px;
+  font-size:12px;
+  border-radius:8px;
+}
+#hudStrip .lang-switch{
+  display:inline-flex;
+  gap:0;
+  border:1px solid var(--border-color);
+  border-radius:8px;
+  overflow:hidden;
+}
+#hudStrip .lang-switch button{
+  min-height:36px;
+  min-width:40px;
+  padding:4px 8px;
+  border:none;
+  border-radius:0;
+  background:var(--bg-input);
+}
+#hudStrip .lang-switch button.on,
+#hudStrip .lang-switch button[aria-pressed="true"]{
+  background:var(--accent);
+  color:#1a140c;
+}
+#hudStrip #sessionModeSel{
+  width:auto;
+  min-width:9.5em;
+  padding:6px 8px;
+  font-size:12px;
+}
+#hudStrip #sessionTimer,
+#hudStrip #hudLive{
+  font-variant-numeric:tabular-nums;
+  color:var(--accent);
+  padding:0 4px;
+}
+#hudStrip #btnToolsMenu{
+  margin-left:auto;
+}
+.stage-controls .btn{
+  min-height:48px;
+}
+@media (max-width:720px){
+  #hudStrip .btn{ padding:6px 8px; font-size:11px; }
+  #hudStrip{ gap:5px; }
+}
+#hudStrip b{color:var(--accent); font-weight:700;}
+#hudStrip .ok{color:var(--ok);}
+#hudStrip .warn{color:var(--warn);}
+@media (hover:hover) and (pointer:fine){
+  #btnThrottle.btn-anchored, #btnBrake.btn-anchored{
+    position:static; width:auto; bottom:auto; left:auto; right:auto;
+    z-index:auto; box-shadow:none;
+  }
+}
+.grid-main{grid-template-columns:1fr;}
+details.details-panel > summary{
+  background:var(--bg-card);
+}
+details.details-panel > summary{background:var(--bg-card);}
+details.details-panel[open] > summary{background:var(--bg-input);}
+details.details-panel[open] > .details-body{
+  border-left:2px solid var(--accent);
+  background:var(--bg-input);
+  padding-left:12px;
+}
+.nav-legend{display:flex;flex-wrap:wrap;gap:8px 12px;list-style:none;margin:6px 0 0;padding:0;font-size:11px;color:var(--text-secondary);}
+.nav-legend .swatch{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--c,#fff);vertical-align:middle;}
+#toolsMenu{max-width:min(420px,96vw); border:1px solid var(--border-color); background:var(--bg-card); color:var(--text-primary); border-radius:14px; padding:16px;}
+#toolsMenu::backdrop{background:rgba(0,0,0,0.55);}
+
+
+#stage{
+  display:grid;
+  grid-template-columns:minmax(0,1.6fr) minmax(260px,0.9fr);
+  gap:10px;
+  padding:8px 12px 12px;
+}
+@media (max-width:900px){
+  #stage{ grid-template-columns:1fr; }
+  #stage .canvas3d{ height:280px !important; }
+}
+#setupDrawer{
+  width:min(720px,96vw);
+  height:min(90vh,920px);
+  max-width:96vw;
+  border:1px solid var(--border-color);
+  background:var(--bg-card);
+  color:var(--text-primary);
+  border-radius:14px;
+  padding:14px;
+}
+#setupDrawer:not([open]){ display:none; }
+#setupDrawer[open]{
+  display:block;
+  position:fixed;
+  top:4vh; left:50%;
+  transform:translateX(-50%);
+  z-index:960;
+}
+#setupDrawer::backdrop{ background:rgba(0,0,0,0.55); }
+#setupDrawerBody{ overflow:auto; max-height:calc(90vh - 56px); -webkit-overflow-scrolling:touch; }
+
 </style>
 </head>
 <body>
@@ -580,7 +724,7 @@ input[type=range]:focus-visible{
   <header class="header">
     <div class="brand">
       <div class="logo">RL</div>
-      <div><h1>RaceLab</h1><span class="sub">Ingeniero de pista · física verificable · no arcade</span></div>
+      <div><h1>RaceLab</h1><span class="sub">Ingeniero de pista · contacto y carga verificables · resto declarado</span></div>
     </div>
     <div class="status">
       <span><span class="dot"></span> simulando</span>
@@ -598,6 +742,38 @@ input[type=range]:focus-visible{
       <button class="btn btn-secondary" id="btnVoice" style="padding:6px 10px;" title="Comando por voz (una frase por pulsación)">🎤 Voz</button>
     </div>
   </header>
+  <div id="hudStrip" aria-live="polite">
+    <span id="hudTrack">SIN PISTA</span>
+    <span>V<span id="hudLaps">0</span></span>
+    <span id="hudLive">00:00.00</span>
+    <span id="hudDelta">Δ —</span>
+    <span>P<span id="hudPos">—</span></span>
+    <span id="hudFuel">⛽ — L</span>
+    <span id="sessionLight" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#661111;border:2px solid #331111;vertical-align:middle;"></span>
+    <span id="sessionState" style="font-size:11px;color:var(--text-secondary);">Espera</span>
+    <button class="btn btn-success" id="btnSessionStart" style="padding:6px 10px;">▶ Salir</button>
+    <button class="btn btn-secondary" id="btnSessionStop" style="padding:6px 10px;">⏹</button>
+    <button class="btn btn-warning" id="btnPitCall" style="padding:6px 10px;">🔧 Boxes</button>
+    <button class="btn btn-success" id="btnVehicleRunBar" style="padding:6px 10px;">▶ Arrancar</button>
+    <button class="btn btn-success" id="btnThrottleBar" style="padding:6px 10px; touch-action:none;">🏎️ Gas</button>
+    <button class="btn btn-warning" id="btnBrakeBar" style="padding:6px 10px; touch-action:none;">🛑 Freno</button>
+    <button type="button" class="btn btn-secondary" id="btnMoreTools" style="padding:6px 10px;" title="Herramientas">⋯</button>
+    <button type="button" class="btn btn-secondary" id="btnToolsMenu" style="padding:6px 10px; margin-left:auto;">⚙ Setup</button>
+  </div>
+  <dialog id="toolsMenu">
+    <form method="dialog" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <strong>Herramientas</strong>
+      <button class="btn btn-secondary" value="close" style="padding:4px 10px;">Cerrar</button>
+    </form>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+      <button type="button" class="btn btn-secondary" id="btnLevelDriveMenu">Conducir</button>
+      <button type="button" class="btn btn-secondary" id="btnLevelAdjustMenu">Ajustar</button>
+      <button type="button" class="btn btn-secondary" id="btnLevelLabMenu">Laboratorio</button>
+    </div>
+    <div id="toolsSlot" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"></div>
+    <p style="font-size:11px;color:var(--text-secondary);margin:10px 0 0;">Banco de rueda y sliders finos: cierra esto y baja al panel del vehículo, o pulsa Laboratorio en Ayuda.</p>
+    <button type="button" class="btn btn-secondary" id="btnExportEngineMenu" style="margin-top:10px;padding:8px 10px;">Exportar motor (JS)</button>
+  </dialog>
 
   <div id="levelSelector" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; padding:14px; background:var(--bg-secondary); border-bottom:1px solid var(--border-color);">
     <button type="button" class="btn btn-secondary level-card" id="btnLevelDrive" aria-pressed="true" style="padding:14px; text-align:left; line-height:1.35;">
@@ -616,39 +792,80 @@ input[type=range]:focus-visible{
 
   <div id="sessionBar" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; padding:10px 14px; background:var(--bg-secondary); border-bottom:1px solid var(--border-color);">
     <div style="display:flex; align-items:center; gap:8px;">
-      <span style="font-size:11px; color:var(--text-secondary); font-weight:700; letter-spacing:0.6px;">SESIÓN</span>
+      <span style="font-size:11px; color:var(--text-secondary); font-weight:700; letter-spacing:0.6px;" data-i18n="ses_label">SESIÓN</span>
       <select id="sessionModeSel" style="flex:1;">
-        <option value="free">Libres</option>
-        <option value="quali">Clasificación</option>
-        <option value="race">Carrera</option>
-        <option value="stint">Stint endurance</option>
+        <option value="free" data-i18n="ses_free">Libres</option>
+        <option value="quali" data-i18n="ses_quali">Clasificación</option>
+        <option value="race" data-i18n="ses_race">Carrera</option>
+        <option value="stint" data-i18n="ses_stint">Stint endurance</option>
       </select>
     </div>
     <div style="display:flex; align-items:center; gap:8px;">
-      <span style="font-size:11px; color:var(--text-secondary); font-weight:700; letter-spacing:0.6px;">SEMÁFORO</span>
-      <span id="sessionLight" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#661111; border:2px solid #331111;"></span>
-      <span id="sessionState" style="font-size:11px; color:var(--text-secondary);">Espera</span>
+      <span style="font-size:11px; color:var(--text-secondary); font-weight:700; letter-spacing:0.6px;" data-i18n="ses_light">SEMÁFORO</span>
+      <span id="sessionLightOld" style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#661111; border:2px solid #331111;"></span>
+      <span id="sessionStateOld" style="font-size:11px; color:var(--text-secondary);">Espera</span>
     </div>
     <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary);">
       <span id="sessionTimer" style="font-family:Menlo,monospace; font-size:13px; color:var(--text-primary);">00:00.00</span>
       <span id="sessionLapCounter">V0 · S1</span>
     </div>
-    <div style="display:flex; gap:6px; flex-wrap:wrap;">
-      <button class="btn btn-success" id="btnSessionStart" style="padding:6px 10px;">▶ Salir</button>
-      <button class="btn btn-secondary" id="btnSessionStop" style="padding:6px 10px;">⏹</button>
-      <button class="btn btn-warning" id="btnPitCall" style="padding:6px 10px;">🔧 Boxes</button>
-      <button class="btn btn-success" id="btnVehicleRunBar" style="padding:6px 10px;">▶ Arrancar</button>
-      <button class="btn btn-success" id="btnThrottleBar" style="padding:6px 10px; touch-action:none;">🏎️ Gas</button>
-      <button class="btn btn-warning" id="btnBrakeBar" style="padding:6px 10px; touch-action:none;">🛑 Freno</button>
-    </div>
   </div>
-  <div id="pitOverlay" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:950; background:var(--bg-card); border:2px solid var(--accent); border-radius:16px; padding:22px 28px; box-shadow:0 20px 60px rgba(0,0,0,0.7); min-width:280px;">
+  <dialog id="pitOverlay" style="border:2px solid var(--accent); border-radius:16px; padding:22px 28px; background:var(--bg-card); color:var(--text-primary); min-width:280px;">
     <div style="font-size:14px; font-weight:700; margin-bottom:12px; color:var(--accent);">🔧 PARADA EN BOXES</div>
     <div id="pitContent" style="display:flex; flex-direction:column; gap:10px;"></div>
     <div style="margin-top:14px; text-align:right;">
       <button class="btn btn-secondary" id="btnPitClose" style="padding:8px 14px;">Cerrar</button>
     </div>
+  </dialog>
+
+
+<div id="stage">
+  <div class="stage-main">
+    <div class="canvas3d" id="stage-canvas" style="height:min(62vh,640px); margin:0;">
+      <div id="three-canvas-4w" role="img" aria-label="Vista 3D del vehículo circulando — el estado en vivo está debajo, en texto"></div>
+      <div class="overlay" id="carOverlay">v=0.0 km/h · ax=0.00g · ay=0.00g</div>
+      <div id="carOverlaySR" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></div>
+    </div>
+    <div class="stage-controls" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin-top:8px;">
+      <div id="steerWheelWrap" style="display:flex; justify-content:center; touch-action:none;">
+        <canvas id="steerWheel" width="160" height="160" style="touch-action:none; cursor:grab; max-width:160px; height:auto; display:block;"></canvas>
+      </div>
+      <div class="btn-row stage-pedals" style="margin:0; flex:1; min-width:180px;">
+        <button class="btn btn-success" id="btnThrottle" style="padding:20px; font-size:14px; touch-action:none;">🏎️ ACELERAR</button>
+        <button class="btn btn-warning" id="btnBrake" style="padding:20px; font-size:14px; touch-action:none;">🛑 FRENAR</button>
+      </div>
+    </div>
   </div>
+  <aside class="stage-side">
+    <div class="plan-wrap" style="position:relative; background:var(--bg-input); border:1px solid var(--border-color); border-radius:12px; padding:10px;">
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+        <button type="button" class="btn btn-secondary" id="btnPlanMonza" style="padding:8px 10px;">🇮🇹 Monza</button>
+        <button type="button" class="btn btn-secondary" id="btnPlanSpa" style="padding:8px 10px;">🇧🇪 Spa</button>
+        <button type="button" class="btn btn-secondary" id="btnPlanMadrid" style="padding:8px 10px;">🇪🇸 Madrid</button>
+        <button type="button" class="btn btn-secondary" id="btnPlanOval" style="padding:8px 10px;">Óvalo</button>
+        <button type="button" class="btn btn-secondary" id="btnPlanClear" style="padding:8px 10px;">Quitar pista</button>
+      </div>
+      <canvas id="trackPlanView" style="width:100%; height:280px; display:block; cursor:crosshair; background:#16120e;"></canvas>
+      <div id="trackPlanInfo" style="position:absolute; top:14px; right:14px; background:rgba(0,0,0,0.75); color:#f4ead8; padding:6px 10px; border-radius:8px; font:11px/1.5 Menlo,monospace; pointer-events:none; display:none;"></div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:11px; color:var(--text-secondary);">
+        <label><input type="checkbox" id="planShowCurv" checked> Color por curvatura</label>
+        <label><input type="checkbox" id="planShowBraking" checked> Puntos de frenada</label>
+        <label><input type="checkbox" id="planShowRacingLine"> Trazada de referencia</label>
+        <label><input type="checkbox" id="planShowSectors" checked> Sectores</label>
+      </div>
+    </div>
+  </aside>
+</div>
+<dialog id="setupDrawer">
+  <div id="setupDrawerHeader" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>Setup</strong>
+      <button type="button" class="btn btn-secondary" id="setupDrawerClose" style="padding:4px 10px;">Cerrar</button>
+    </div>
+    <div id="setupToolsHost" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"></div>
+  </div>
+  <div id="setupDrawerBody"></div>
+</dialog>
 
   <div id="cmdBar" class="cmd-bar" role="search" aria-label="Barra de comandos">
     <span class="cmd-bar-icon" aria-hidden="true">⌨</span>
@@ -668,7 +885,10 @@ input[type=range]:focus-visible{
 
   <div id="mainContent" role="main">
   <div id="manualPanel" class="panel" style="display:none; font-size:13px; line-height:1.6; color:var(--text-secondary); max-height:70vh; overflow-y:auto;">
-    <div class="section-title">Ayuda — DriveCore Pro</div>
+    <div class="section-title">Ayuda — RaceLab</div>
+    <p style="margin-top:8px;"><b style="color:var(--text-primary);">Idioma.</b>
+    La interfaz está mayoritariamente en español. ES/EN cambia botones principales; la mayoría de sliders siguen en español.</p>
+
     <p style="margin-top:8px;"><b style="color:var(--text-primary);">Qué es.</b> Laboratorio en el navegador: contacto de cerda (Dahl + Stribeck) y un vehículo de 3 a 10 ruedas con suspensión, motor, pendientes, ABS/TCS, ADAS, tráfico y un GPS de juguete. <b style="color:var(--text-primary);">Qué no es.</b> Ni banco de ensayos ni ADAS de un coche de serie. Los μ son genéricos.</p>
     <button class="btn btn-secondary" id="btnExportEngine" style="padding:8px 14px; margin-top:10px;">📦 Exportar motor de física (.js) — para usar en otro proyecto</button>
 
@@ -738,7 +958,7 @@ input[type=range]:focus-visible{
     <p style="margin-top:10px;">Hay un Word descargable con las fórmulas (Anexo A). Esta Ayuda es la versión corta para usarla en el teléfono.</p>
   </div>
 
-<details class="details-panel level-lab" open>
+<details class="details-panel level-lab">
   <summary>🔬 Banco de neumático — laboratorio</summary>
   <div class="details-body">
 <div class="honesty-note">
@@ -868,7 +1088,7 @@ input[type=range]:focus-visible{
 </details>
 
 
-<details class="details-panel level-adjust" open>
+<details class="details-panel level-adjust">
   <summary>🧰 Maletín de ingeniero — setup agrupado</summary>
   <div class="details-body">
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px;">
@@ -935,7 +1155,13 @@ input[type=range]:focus-visible{
 <details class="details-panel level-adjust" open>
   <summary>📊 Informe post-vuelta</summary>
   <div class="details-body">
-    <div id="reportEmpty" style="color:var(--text-secondary); font-size:12px;">Cruza la línea de meta para ver el informe.</div>
+    <div id="liveLapPanel" style="font-size:12px; line-height:1.5; margin-bottom:10px; padding:8px 10px; background:var(--bg-input); border-radius:8px;">
+      En curso: <span id="liveLapTime">0.00</span>s
+      · Δ <span id="liveLapDelta">—</span>
+      · s <span id="liveLapS">0</span>%
+    </div>
+    <div id="standingsPanel" style="font-family:Menlo,monospace; font-size:11px; line-height:1.55; margin-bottom:10px; white-space:pre-wrap;"></div>
+    <div id="reportEmpty" style="color:var(--text-secondary); font-size:12px;">Al cruzar meta se consolida la vuelta aquí.</div>
     <div id="reportContent" style="display:none;">
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:12px;">
         <div class="stat"><div class="val" id="repLapTime">—</div><div class="lbl">Tiempo vuelta</div></div>
@@ -1378,6 +1604,7 @@ input[type=range]:focus-visible{
     </div>
     <div class="section-title" style="margin-top:12px;">Ayudas visuales 3D (no son física)</div>
     <div style="display:flex; flex-wrap:wrap; gap:10px 16px; font-size:12px; color:var(--text-secondary); margin-top:6px;">
+      <label class="adv-toggle" style="cursor:pointer;"><input type="checkbox" id="arcadeLaunchAssist"> Asistencia de arranque (21 km/h al pisar gas parado)</label>
       <label class="adv-toggle" style="cursor:pointer;"><input type="checkbox" id="vizMarks" checked> Marca amarilla de giro</label>
       <label class="adv-toggle" style="cursor:pointer;"><input type="checkbox" id="vizArrow" checked> Flecha ámbar de Fy</label>
       <label class="adv-toggle" style="cursor:pointer;"><input type="checkbox" id="vizHub" checked> Buje ámbar</label>
@@ -1392,38 +1619,8 @@ input[type=range]:focus-visible{
     <div style="font-size:11px; color:var(--text-secondary); line-height:1.5;">
       <b>Controles:</b> flechas / WASD, mando (gatillos + stick), o táctil abajo. Q / E (o , / .) cambian marcha en modo manual. Cámara fija: arrastra para orbitar.
     </div>
-    <div id="steerWheelWrap" style="display:flex; justify-content:center; margin-top:8px; touch-action:none;">
-      <canvas id="steerWheel" width="220" height="220" style="touch-action:none; cursor:grab; max-width:100%; height:auto; display:block;"></canvas>
-    </div>
-    <div style="text-align:center; font-size:11px; color:var(--text-secondary); margin-top:-4px;">
-      Arrastra horizontal sobre el volante · el amarillo marca el centro
-    </div>
-    <div class="btn-row" style="margin-top:8px;">
-      <button class="btn btn-success" id="btnThrottle" style="padding:20px; font-size:14px; touch-action:none;">🏎️ ACELERAR</button>
-      <button class="btn btn-warning" id="btnBrake" style="padding:20px; font-size:14px; touch-action:none;">🛑 FRENAR</button>
-    </div>
 
-    <div class="canvas3d" style="height:640px; margin-top:12px;">
-      <div id="three-canvas-4w" role="img" aria-label="Vista 3D del vehículo circulando — el estado en vivo está debajo, en texto"></div>
-      <div class="overlay" id="carOverlay">v=0.0 km/h · ax=0.00g · ay=0.00g</div>
-      <div id="carOverlaySR" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></div>
-    </div>
-    <div class="section-title" style="margin-top:14px;">🗺️ Vista de planta</div>
-    <div style="position:relative; background:var(--bg-input); border:1px solid var(--border-color); border-radius:12px; padding:10px; margin-top:6px;">
-      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-        <button type="button" class="btn btn-secondary" id="btnPlanMonza" style="padding:8px 10px;">🇮🇹 Monza</button>
-        <button type="button" class="btn btn-secondary" id="btnPlanOval" style="padding:8px 10px;">Óvalo</button>
-        <button type="button" class="btn btn-secondary" id="btnPlanClear" style="padding:8px 10px;">Quitar pista</button>
-      </div>
-      <canvas id="trackPlanView" style="width:100%; height:200px; display:block; cursor:crosshair; background:#16120e;"></canvas>
-      <div id="trackPlanInfo" style="position:absolute; top:14px; right:14px; background:rgba(0,0,0,0.75); color:#f4ead8; padding:6px 10px; border-radius:8px; font:11px/1.5 Menlo,monospace; pointer-events:none; display:none;"></div>
-      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; font-size:11px; color:var(--text-secondary);">
-        <label><input type="checkbox" id="planShowCurv" checked> Color por curvatura</label>
-        <label><input type="checkbox" id="planShowBraking" checked> Puntos de frenada</label>
-        <label><input type="checkbox" id="planShowRacingLine"> Trazada de referencia</label>
-        <label><input type="checkbox" id="planShowSectors" checked> Sectores</label>
-      </div>
-    </div>
+
     <div class="tele-wrap">
       <div>
         <div class="section-title" data-i18n="sec_tele">Telemetría + GPS</div>
@@ -1453,6 +1650,16 @@ input[type=range]:focus-visible{
           <div class="tele-item"><div class="tv" id="telTireWear">0%</div><div class="tl">desg. neumático</div></div>
         </div>
         <div class="gps-wrap"><canvas id="gpsMap" role="img" aria-label="Mini-mapa del circuito, mismos ejes que la planta: X este, Z norte"></canvas></div>
+        <div class="section-title" style="margin-top:12px;">Mapa de navegación — EKF y partículas</div>
+        <div class="gps-wrap"><canvas id="navMap" width="560" height="220" style="width:100%; height:180px; display:block; background:#0f1825; border-radius:10px;" role="img" aria-label="Mapa EKF-SLAM y filtro de partículas"></canvas></div>
+        <ul class="nav-legend" aria-label="Leyenda del mapa">
+          <li><span class="swatch" style="--c:#e8a54b"></span>Verdad</li>
+          <li><span class="swatch" style="--c:#7cc8ff"></span>GPS</li>
+          <li><span class="swatch" style="--c:#7cffb2"></span>Kalman</li>
+          <li><span class="swatch" style="--c:#ff6b9a"></span>EKF-SLAM</li>
+          <li><span class="swatch" style="--c:#fff"></span>Partículas</li>
+          <li><span class="swatch" style="--c:#ffb347"></span>VO</li>
+        </ul>
         <div id="fusLive" style="font-family:Menlo,monospace; font-size:11px; color:var(--text-primary); background:var(--bg-input); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; margin-top:8px; line-height:1.55;">
           fusión en vivo —
         </div>
@@ -1465,7 +1672,7 @@ input[type=range]:focus-visible{
           <b>GPS:</b> verdad + random walk + ruido·HDOP (σ≈2.2·HDOP m).
           <b>Calibración IMU:</b> media de gyro/accel ~2 s con v&lt;0.4 m/s → bias restado al gyro.
           <b>Fusión α:</b> complementario (violeta). <b>Kalman 4 estados</b> [E,N,vE,vN] (verde): predict accel, update GPS, P diagonal.
-          <b>VO</b> naranja. <b>EKF-SLAM</b> rosa: [E,N,ψ] + 3 hitos de sector (rango-rumbo ruidoso). <b>Partículas</b> aro blanco: 60 hipótesis, peso GPS+distancia a pista, resample si Neff&lt;0.4N.
+          <b>VO</b> naranja. <b>EKF-SLAM</b> rosa: [E,N,ψ] + 3 hitos de sector (rango-rumbo ruidoso). <b>Partículas</b> aro blanco: 60 hipótesis, peso GPS+distancia a pista, resample <b>estratificado</b> si Neff&lt;0.5N. EKF con Jacobiana F del unicycle y P 3×3.
           Ninguno sustituye a un SLAM visual real.
           <div style="margin-top:6px;"><button type="button" class="btn btn-secondary" id="btnImuCal" style="padding:8px 10px;">Calibrar IMU (parado)</button></div>
         </div>
@@ -2193,6 +2400,7 @@ var vehicle = {
   aeroYawDragGain: 0.6, aeroRollSensitivity: 0.15,
   bumpsOn: false, bumpDepth: 0.04, bumpFreq: 0.8, bumpAsym: 0.4,
   epsOn: true, epsAssist: 0.7, epsReturn: 0.55,
+  arcadeLaunchAssist: false,
   trackWallMode: 'medium',
   collisionsOn: false, obstacleDist: 18, chassisK: 280000, restitution: 0.28, obstacleHard: 0.55,
   plasticDef: 0,
@@ -2249,6 +2457,54 @@ vehicle.transmission = new Transmission({
   });
 })(vehicle);
 
+
+var LocalStore = (function(){
+  function read(key, expectedVersion, fallback){
+    try {
+      var raw = localStorage.getItem(key);
+      if (raw == null) return fallback;
+      var parsed = JSON.parse(raw);
+      if (parsed == null || typeof parsed !== 'object') return parsed;
+      var v = (parsed._v != null) ? parsed._v : 1;
+      if (v > expectedVersion){
+        console.warn('LocalStore: "' + key + '" v' + v + ' > ' + expectedVersion);
+        return fallback;
+      }
+      if (v < expectedVersion){
+        console.warn('LocalStore: "' + key + '" v' + v + ' < ' + expectedVersion + ', sin migrador');
+        return fallback;
+      }
+      return parsed;
+    } catch(e){
+      console.warn('LocalStore: no pude leer "' + key + '":', e.message);
+      return fallback;
+    }
+  }
+  function write(key, value, version){
+    try {
+      var toStore = Object.assign({}, value);
+      toStore._v = version || 1;
+      localStorage.setItem(key, JSON.stringify(toStore));
+      return true;
+    } catch(e){
+      console.warn('LocalStore: no pude escribir "' + key + '":', e.message);
+      return false;
+    }
+  }
+  function remove(key){
+    try { localStorage.removeItem(key); return true; } catch(e){ return false; }
+  }
+  function has(key){
+    try { return localStorage.getItem(key) != null; } catch(e){ return false; }
+  }
+  return { read: read, write: write, remove: remove, has: has };
+})();
+
+/* Persistencia — decisión:
+   racelab:v1:prefs UI; drivecore_presets_v1 / autosave / cmd_history versionados en el nombre;
+   drivecore_saved_lap versionado con LocalStore._v; theme/lang/level triviales sin _v;
+   racelab_baseline_A snapshot plano. No unificamos todo bajo un JSON.
+*/
 /* DriveCorePersist: guardado en localStorage. Autoguardado + presets con
    nombre + export/import a .json — no toca la física, solo lee/escribe
    'vehicle' (incluida vehicle.transmission, tratada aparte porque es una
@@ -2493,13 +2749,13 @@ var KalmanEN = {
   }
 };
 var EkfSlam = {
-  // EKF-SLAM mínimo: estado robot [E,N,ψ] + 3 hitos fijos (sectores).
-  // Los hitos se inicializan en las marcas de sector del TRACK. No es ORB-SLAM.
-  x: [0,0,0], Pdiag: [2,2,0.05],
+  // EKF unicycle [E,N,ψ]. P 3×3. F = ∂f/∂x.
+  x: [0,0,0],
+  P: [2,0,0, 0,2,0, 0,0,0.05],
   lm: [],
   reset: function(){
     this.x = [chassis.x||0, chassis.z||0, chassis.psi||0];
-    this.Pdiag = [2,2,0.05];
+    this.P = [2,0,0, 0,2,0, 0,0,0.05];
     this.lm = [];
     if (TRACK.segs.length){
       for (var i=0;i<3;i++){
@@ -2509,22 +2765,40 @@ var EkfSlam = {
     }
   },
   wrap: function(a){ return Math.atan2(Math.sin(a), Math.cos(a)); },
+  mul3: function(A,B){
+    var C=new Array(9),i,j,k,s;
+    for(i=0;i<3;i++) for(j=0;j<3;j++){
+      s=0; for(k=0;k<3;k++) s+=A[i*3+k]*B[k*3+j]; C[i*3+j]=s;
+    }
+    return C;
+  },
+  tr3: function(A){ return [A[0],A[3],A[6], A[1],A[4],A[7], A[2],A[5],A[8]]; },
+  add3: function(A,B){ var C=new Array(9),i; for(i=0;i<9;i++) C[i]=A[i]+B[i]; return C; },
   step: function(dt, gps){
     if (dt<=0 || dt>0.2) dt=0.016;
-    var u = chassis.u||0, r = chassis.r||0;
-    this.x[2] = this.wrap(this.x[2] + r*dt);
-    this.x[0] += u*Math.sin(this.x[2])*dt;
-    this.x[1] += u*Math.cos(this.x[2])*dt;
-    this.Pdiag[0] += 0.3*dt; this.Pdiag[1] += 0.3*dt; this.Pdiag[2] += 0.01*dt;
+    var u = chassis.u||0, r = chassis.r||0, th = this.x[2];
+    var s=Math.sin(th), c=Math.cos(th);
+    this.x[0] += u*s*dt;
+    this.x[1] += u*c*dt;
+    this.x[2] = this.wrap(th + r*dt);
+    // F = [[1,0,u*c*dt],[0,1,-u*s*dt],[0,0,1]]
+    var F=[1,0,u*c*dt,  0,1,-u*s*dt,  0,0,1];
+    var Q=[0.2*dt,0,0, 0,0.2*dt,0, 0,0,0.008*dt];
+    this.P = this.add3(this.mul3(this.mul3(F,this.P), this.tr3(F)), Q);
     if (gps.eastMeas!=null){
-      var rg = Math.max(2, (gps.hdop||1)*2.2); var rg2=rg*rg;
-      var Ke = this.Pdiag[0]/(this.Pdiag[0]+rg2);
-      var Kn = this.Pdiag[1]/(this.Pdiag[1]+rg2);
-      this.x[0] += Ke*(gps.eastMeas-this.x[0]);
-      this.x[1] += Kn*(gps.northMeas-this.x[1]);
-      this.Pdiag[0]*=(1-Ke); this.Pdiag[1]*=(1-Kn);
+      var R = Math.pow(Math.max(1.5,(gps.hdop||1)*2.2),2);
+      // H_E = [1,0,0]
+      var S = this.P[0]+R, K0=this.P[0]/S, K1=this.P[3]/S, K2=this.P[6]/S;
+      var inn = gps.eastMeas-this.x[0];
+      this.x[0]+=K0*inn; this.x[1]+=K1*inn; this.x[2]=this.wrap(this.x[2]+K2*inn);
+      var IKH=[1-K0,0,0, -K1,1,0, -K2,0,1];
+      this.P=this.mul3(IKH,this.P);
+      S = this.P[4]+R; K0=this.P[1]/S; K1=this.P[4]/S; K2=this.P[7]/S;
+      inn = gps.northMeas-this.x[1];
+      this.x[0]+=K0*inn; this.x[1]+=K1*inn; this.x[2]=this.wrap(this.x[2]+K2*inn);
+      IKH=[1,-K0,0, 0,1-K1,0, 0,-K2,1];
+      this.P=this.mul3(IKH,this.P);
     }
-    // rango-rumbo a hitos (medida = geometría verdadera + ruido)
     var i, lm, de, dn, rng, bear, rngM, bearM, Kr;
     for (i=0;i<this.lm.length;i++){
       lm = this.lm[i];
@@ -2540,8 +2814,10 @@ var EkfSlam = {
     }
     gps.eastEkf = this.x[0]; gps.northEkf = this.x[1];
     gps.ekfErrM = Math.hypot(this.x[0]-(chassis.x||0), this.x[1]-(chassis.z||0));
+    gps.ekfPe = this.P[0]; gps.ekfPn = this.P[4];
   }
 };
+
 var ParticleLoc = {
   // Localización Monte-Carlo en el plano. N=60. Peso ∝ exp(-d_GPS²) y dist. a pista.
   N: 60, parts: [],
@@ -2580,19 +2856,18 @@ var ParticleLoc = {
       e += this.parts[i].e * this.parts[i].w;
       n += this.parts[i].n * this.parts[i].w;
     }
-    // resample multinomial ligero si Neff bajo
     var neff=0;
     for (i=0;i<this.parts.length;i++) neff += this.parts[i].w*this.parts[i].w;
     neff = 1/Math.max(neff,1e-9);
-    if (neff < this.N*0.4){
+    if (neff < this.N*0.5){
       var cdf=[], acc=0;
       for (i=0;i<this.parts.length;i++){ acc+=this.parts[i].w; cdf.push(acc); }
-      var neu=[];
-      for (i=0;i<this.N;i++){
-        var u2=Math.random(), j=0;
-        while (j<cdf.length-1 && cdf[j]<u2) j++;
+      var neu=[], N=this.N, u0=Math.random()/N, j=0;
+      for (i=0;i<N;i++){
+        var uS = u0 + i/N;
+        while (j<cdf.length-1 && cdf[j] < uS) j++;
         var src=this.parts[j];
-        neu.push({e:src.e+(Math.random()-0.5)*0.4, n:src.n+(Math.random()-0.5)*0.4, yaw:src.yaw, w:1});
+        neu.push({e:src.e+(Math.random()-0.5)*0.25, n:src.n+(Math.random()-0.5)*0.25, yaw:src.yaw, w:1});
       }
       this.parts = neu;
     }
@@ -2981,6 +3256,8 @@ function notifyTrackChanged(){
     setGpsOrigin(guessTrackOriginKey());
     trackMinimapCache.totalLength = -1;
   }
+  window._fixedWorldCam = null;
+  if (typeof fixedCamReady !== 'undefined') fixedCamReady = false;
 }
 function loadTrackPreset(name){
   notifyTrackChanged();
@@ -3374,6 +3651,54 @@ function updateGPS(dt){
   EkfSlam.step(dt, gpsState);
   ParticleLoc.step(dt, gpsState);
 }
+function drawNavMap(){
+  var c = document.getElementById('navMap');
+  if (!c || !c.getContext) return;
+  var ctx = c.getContext('2d');
+  var w = c.width, h = c.height;
+  ctx.fillStyle = '#0f1825'; ctx.fillRect(0,0,w,h);
+  if (!TRACK.segs.length){
+    ctx.fillStyle='#8899bb'; ctx.font='12px sans-serif';
+    ctx.fillText('Carga un circuito para el mapa EKF / PF', 12, h/2);
+    return;
+  }
+  if (trackMinimapCache.totalLength !== TRACK.totalLength || !trackMinimapCache.points){
+    buildTrackMinimapCache(w, h);
+  }
+  var cache = trackMinimapCache;
+  function toPx(x,z){ return { px: x*cache.scale + cache.offX, py: h - (z*cache.scale + cache.offY) }; }
+  ctx.strokeStyle='#4ecdc4'; ctx.lineWidth=2; ctx.beginPath();
+  cache.points.forEach(function(p,i){
+    var q=toPx(p.x,p.z); if(i===0) ctx.moveTo(q.px,q.py); else ctx.lineTo(q.px,q.py);
+  });
+  ctx.stroke();
+  if (typeof ParticleLoc!=='undefined' && ParticleLoc.parts){
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ParticleLoc.parts.forEach(function(pt){
+      var q=toPx(pt.e, pt.n);
+      ctx.fillRect(q.px-1, q.py-1, 2, 2);
+    });
+  }
+  if (typeof EkfSlam!=='undefined' && EkfSlam.lm){
+    ctx.fillStyle='#ff6b9a';
+    EkfSlam.lm.forEach(function(lm){
+      var q=toPx(lm.e, lm.n);
+      ctx.beginPath(); ctx.arc(q.px,q.py,4,0,Math.PI*2); ctx.fill();
+    });
+  }
+  function mark(x,z,color,r){
+    if (x==null) return;
+    var q=toPx(x,z);
+    ctx.fillStyle=color; ctx.beginPath(); ctx.arc(q.px,q.py,r,0,Math.PI*2); ctx.fill();
+  }
+  mark(gpsState.eastMeas, gpsState.northMeas, 'rgba(120,200,255,0.8)', 5);
+  mark(gpsState.eastKf, gpsState.northKf, '#7cffb2', 4);
+  mark(gpsState.eastEkf, gpsState.northEkf, '#ff6b9a', 4);
+  mark(gpsState.eastPf, gpsState.northPf, '#ffffff', 4);
+  mark(chassis.x, chassis.z, '#e8a54b', 5);
+  ctx.fillStyle='#8899bb'; ctx.font='10px monospace';
+  ctx.fillText('EKF-SLAM + PF  N↑ X→', 8, h-8);
+}
 function drawGPSMap(){
   var c = document.getElementById('gpsMap');
   if (!c) return;
@@ -3696,7 +4021,9 @@ function applyADAS(dt){
   var leadCar = nearestLead();
   var lead = vehicle.leadDist != null ? vehicle.leadDist : 40;
   var vLead = leadCar ? leadCar.u : (vehicle.leadSpeed != null ? vehicle.leadSpeed : 12);
-  var gapLead = leadCar ? (leadCar.z - chassis.z - 4.2) : (lead - chassis.z);
+  var egoZ = chassis.z;
+  if (gpsState && gpsState.northKf != null) egoZ = gpsState.northKf;
+  var gapLead = leadCar ? (leadCar.z - egoZ - 4.2) : (lead - egoZ);
   var gap = Math.min(gapWall, gapLead);
   var closing = gap === gapWall ? v : Math.max(0, v - vLead);
   var ttc = closing > 0.3 ? gap / closing : 99;
@@ -4287,7 +4614,8 @@ function stepVehicle(dt){
   var _physOut = stepVehiclePhysics(dt);
   var results = _physOut.results, kappasOut = _physOut.kappasOut, fzOut = _physOut.fzOut;
   var v = Math.sqrt(chassis.u*chassis.u + chassis.w*chassis.w);
-  if (((touchControls.throttle||0) > 0.5 || (controls.throttle||0) > 0.5) && v < 1.2){
+  if (vehicle.arcadeLaunchAssist &&
+      ((touchControls.throttle||0) > 0.5 || (controls.throttle||0) > 0.5) && v < 1.2){
     chassis.u = Math.max(chassis.u, 6);
     currentWheelDefs.forEach(function(w){
       wheelOmega[w.id] = (wheelOmega[w.id]||0) + (6 / Math.max(0.2, coefs.R0||0.315));
@@ -4802,7 +5130,7 @@ function stepVehiclePhysics(dt){
           chassis._sectorTimes[chassis._lastSector] = chassis._lapTimer - (chassis._sectorStartTimer||0);
           chassis._sectorStartTimer = chassis._lapTimer;
           if (sectorNow === 0){
-            // Vuelta completa.
+            chassis._lapCount = (chassis._lapCount||0) + 1;
             chassis._lastLapTime = chassis._lapTimer;
             if (!chassis._bestLapTime || chassis._lastLapTime < chassis._bestLapTime){
               chassis._bestLapTime = chassis._lastLapTime;
@@ -5237,6 +5565,21 @@ function rebuildWheelReadoutDOM(){
 // se perdería el estado de relajación/suspensión de cada rueda.
 function rebuildWheelStructures(){
   recomputeLayoutPositions();
+  var validIds = {};
+  currentWheelDefs.forEach(function(w){ validIds[w.id] = true; });
+  if (typeof bristle !== 'undefined'){
+    Object.keys(bristle).forEach(function(k){
+      if (k.indexOf('rival_') === 0 || k.indexOf('selftest_') === 0) return;
+      if (!validIds[k]) delete bristle[k];
+    });
+  }
+  Object.keys(wheels).forEach(function(k){ if (!validIds[k]) delete wheels[k]; });
+  Object.keys(suspension).forEach(function(k){ if (!validIds[k]) delete suspension[k]; });
+  Object.keys(wheelSpin).forEach(function(k){ if (!validIds[k]) delete wheelSpin[k]; });
+  Object.keys(wheelOmega).forEach(function(k){ if (!validIds[k]) delete wheelOmega[k]; });
+  if (typeof wheelHop !== 'undefined'){
+    Object.keys(wheelHop).forEach(function(k){ if (!validIds[k]) delete wheelHop[k]; });
+  }
   var newWheels = {}, newSuspension = {}, newSpin = {}, newOm = {};
   currentWheelDefs.forEach(function(w){
     newWheels[w.id] = wheels[w.id] || new TireModel(coefs);
@@ -5427,6 +5770,7 @@ function update4wScene(results, kappasMap){
   if (!scene4wReady) return;
   syncTrafficMeshes();
   drawGPSMap();
+  drawNavMap();
   updateTelemetry();
 
   var tireHalfW = Math.max(0.05, (vehicle.tireWidthMm||215)/2000);
@@ -5518,10 +5862,6 @@ function update4wScene(results, kappasMap){
     camera4w.lookAt(chassis.x, 0.4, chassis.z);
   } else if (cameraMode === 'hood'){
     fixedCamReady = false;
-    // geom.halfL no existe suelto en este scope — hay que pedirlo a
-    // vehicleBodyGeom() (arreglado respecto a la guía original, que
-    // usaba 'geom' como si ya estuviera declarado).
-    var geom = vehicleBodyGeom();
     var hoodX = chassis.x + cpsi * (geom.halfL * 0.75);
     var hoodZ = chassis.z - spsi * (geom.halfL * 0.75);
     camera4w.position.set(hoodX, 0.95 + (chassis.zS||0), hoodZ);
@@ -5532,6 +5872,13 @@ function update4wScene(results, kappasMap){
     var ckZ = chassis.z + spsi * 0.35;
     camera4w.position.set(ckX, 0.90 + (chassis.zS||0), ckZ);
     camera4w.lookAt(chassis.x + cpsi*15, 0.85, chassis.z - spsi*15);
+  } else if (cameraMode === 'fixed'){
+    if (!window._fixedWorldCam){
+      window._fixedWorldCam = { x: chassis.x + 8, y: 6, z: chassis.z - 14 };
+    }
+    var fw = window._fixedWorldCam;
+    camera4w.position.set(fw.x, fw.y, fw.z);
+    camera4w.lookAt(chassis.x, 0.5, chassis.z);
   } else if (cameraMode === 'free'){
     // Orbita siguiendo al coche, pero desde más lejos y más alto.
     // Ignora la flecha de dirección — útil para grabar.
@@ -5661,13 +6008,14 @@ function buildTrackBarriers(){
   trackBarrierMeshes = [];
   if (!TRACK.segs.length || !scene4w) return;
   if (!vehicle.trackWallMode || vehicle.trackWallMode === 'off') return;
-  if (isConstrainedGPU()) return;
 
   var width = TRACK.width || 10;
   var barrierH = 0.55;
   var barrierT = 0.10;
-  var stepLen = Math.max(8, TRACK.totalLength / 200);
-  var n = Math.max(2, Math.min(200, Math.ceil(TRACK.totalLength / stepLen)));
+  var mobile = typeof isConstrainedGPU === 'function' && isConstrainedGPU();
+  var maxN = mobile ? 80 : 200;
+  var stepLen = Math.max(mobile ? 14 : 8, TRACK.totalLength / maxN);
+  var n = Math.max(2, Math.min(maxN, Math.ceil(TRACK.totalLength / stepLen)));
   var barrierTex = makeBarrierTexture();
 
   [-1, 1].forEach(function(side){
@@ -6010,18 +6358,15 @@ function bindVehicleControls(){
     var el = document.getElementById(id);
     if (el) el.addEventListener('click', fn);
   }
-  bindPlanShortcut('btnPlanMonza', function(){
-    if (typeof loadExternalTrack === 'function') loadExternalTrack('monza');
-    else {
-      var row = document.getElementById('externalTracksRow');
-      if (row){
-        var btns = row.querySelectorAll('button');
-        for (var i=0;i<btns.length;i++){
-          if ((btns[i].textContent||'').toLowerCase().indexOf('monza')!==-1){ btns[i].click(); return; }
-        }
-      }
+  function clickExternalTrack(id){
+    if (typeof window.applyNamedTrack === 'function' && window.applyNamedTrack(id)) return;
+    if (typeof window.loadExternalTrack === 'function' && window.loadExternalTrack !== window.applyNamedTrack){
+      try { window.loadExternalTrack(id); } catch(e){}
     }
-  });
+  }
+  bindPlanShortcut('btnPlanMonza', function(){ clickExternalTrack('monza'); });
+  bindPlanShortcut('btnPlanSpa', function(){ clickExternalTrack('spa'); });
+  bindPlanShortcut('btnPlanMadrid', function(){ clickExternalTrack('madrid'); });
   bindPlanShortcut('btnPlanOval', function(){ loadTrackPreset('oval'); showToast('Óvalo cargado'); });
   bindPlanShortcut('btnPlanClear', function(){
     var c = document.getElementById('btnTrackClear');
@@ -6347,6 +6692,15 @@ function bindVehicleControls(){
   }
   bindVizCheck('vizMarks', 'marks');
   bindVizCheck('vizArrow', 'arrow');
+  var alaCb = document.getElementById('arcadeLaunchAssist');
+  if (alaCb){
+    alaCb.checked = !!vehicle.arcadeLaunchAssist;
+    alaCb.addEventListener('change', function(){
+      vehicle.arcadeLaunchAssist = !!alaCb.checked;
+      if (typeof showToast==='function')
+        showToast(alaCb.checked ? '🏎️ Asistencia de arranque ON' : 'Asistencia de arranque off');
+    });
+  }
   bindVizCheck('vizHub', 'hub');
 
   bindTouchControls();
@@ -6383,6 +6737,8 @@ function bindVehicleControls(){
     if (vehicle.tireType && typeof applyTireType === 'function') applyTireType(vehicle.tireType, false);
     computeWheelGeometry();
     if (typeof rebuildWheelMeshes3D === 'function') rebuildWheelMeshes3D();
+    var alaCbRefresh = document.getElementById('arcadeLaunchAssist');
+    if (alaCbRefresh) alaCbRefresh.checked = !!vehicle.arcadeLaunchAssist;
   }
   window.refreshUIFromVehicle = refreshUIFromVehicle;
   function refreshPresetDropdown(){
@@ -6669,6 +7025,7 @@ function applyTheme(theme){
   document.documentElement.setAttribute('data-theme', theme);
   document.getElementById('btnTheme').textContent = theme === 'light' ? '☀️ Claro' : '🌙 Oscuro';
   try { localStorage.setItem('tiresim_theme', theme); } catch(e){}
+  try { uiState.theme = theme; saveUiPrefs(); } catch(eU){}
   if (sceneReady){ scene.background = new THREE.Color(themeColor('--scene-bg')); }
   if (scene4wReady){
     var bgColor = new THREE.Color(themeColor('--scene-bg'));
@@ -6701,7 +7058,16 @@ function buildEngineSource(){
     return 'Transmission.prototype.' + name + ' = ' + Transmission.prototype[name].toString() + ';';
   }).join('\n  ') + '\n  Transmission.gearLabel = ' + Transmission.gearLabel.toString() + ';';
 
-  return TIRE_SIM_ENGINE_SOURCE
+  var headerBanner = [
+    '/**',
+    ' * AVISO — el Vehicle exportado asume 4 ruedas. El sim en vivo admite 3–10.',
+    ' * Contacto, Wheel, Aero, Track y Traffic sí coinciden (toString).',
+    ' * No incluye ABS/TCS/ADAS ni el ciclo térmico completo.',
+    ' * Para N ruedas, generaliza Vehicle._substep (Wheel.deriveGeometry + computeWheelFzTargets del HTML).',
+    ' */',
+    ''
+  ].join('\n');
+  return headerBanner + TIRE_SIM_ENGINE_SOURCE
     .replace('__AEROMODEL_CLASS_PLACEHOLDER__', AeroModel.toString())
     .replace('__TRACKSYSTEM_CLASS_PLACEHOLDER__', TrackSystem.toString())
     .replace('__TRAFFICSYSTEM_CLASS_PLACEHOLDER__', TrafficSystem.toString())
@@ -6724,20 +7090,67 @@ function exportEngine(){
 
 
 var uiLang = 'es';
+var uiState = {
+  level: 'drive', drawerOpen: false, camera: 'chase',
+  session: 'idle', lang: 'es', theme: 'dark',
+  viz: { marks: true, arrow: true, hub: true }
+};
+function loadUiPrefs(){
+  try {
+    var raw = localStorage.getItem('racelab:v1:prefs');
+    if (raw){ Object.assign(uiState, JSON.parse(raw)); }
+    else {
+      uiState.theme = localStorage.getItem('tiresim_theme') || uiState.theme;
+      uiState.lang = localStorage.getItem('tiresim_lang') || uiState.lang;
+      uiState.level = localStorage.getItem('drivecore_level') || uiState.level;
+    }
+  } catch(e){}
+  uiLang = uiState.lang || 'es';
+}
+function saveUiPrefs(){
+  try { localStorage.setItem('racelab:v1:prefs', JSON.stringify(uiState)); } catch(e){}
+}
+function setUiState(patch){
+  Object.assign(uiState, patch);
+  if (patch.lang) uiLang = patch.lang;
+  saveUiPrefs();
+  try { if (typeof applyI18n === 'function') applyI18n(); } catch(e){}
+}
+loadUiPrefs();
 var I18N = {
   es: {
     help_btn:'❓ Ayuda', help_close:'Cerrar ayuda', theme_dark:'🌙 Oscuro', theme_light:'☀️ Claro',
-    export:'📦 Motor JS', sub:'Cerda Dahl–Stribeck · rampa · ABS/TCS · ADAS · tráfico',
+    export:'📦 Motor JS', sub:'Ingeniero de pista · física verificable · no arcade',
     sec_tele:'Telemetría + GPS simulado', sec_traf:'Tráfico', tl_gear:'marcha', tl_hdg:'ψ ° (0=+Z)',
     traf_n:'N.º coches', traf_v:'Vel. tráfico', traf_add:'+ coche', traf_clr:'Vaciar', traf_test:'Test tráfico',
-    running:'simulando', empty_traf:'Sin tráfico'
+    running:'simulando', empty_traf:'Sin tráfico',
+    hud_nopit:'SIN PISTA', hud_setup:'⚙ Setup', hud_tools:'Herramientas', hud_close:'Cerrar',
+    hud_export:'Exportar motor (JS)',
+    ses_label:'SESIÓN', ses_light:'SEMÁFORO', ses_free:'Libres', ses_quali:'Clasificación',
+    ses_race:'Carrera', ses_stint:'Stint endurance', ses_wait:'Espera',
+    ses_go:'▶ Salir', ses_stop:'⏹', ses_pit:'🔧 Boxes', ses_run:'▶ Arrancar',
+    pit_title:'🔧 PARADA EN BOXES', pit_compound:'Compuesto', pit_fuel:'⛽ Repostar hasta 60 L',
+    pit_repair:'🛠️ Reparar (10s)', pit_done:'Listo',
+    cmd_cat_track:'Circuito', cmd_cat_tire:'Neumático', cmd_cat_surf:'Superficie',
+    cmd_cat_go:'Marcha', cmd_cat_adas:'ADAS', cmd_cat_slope:'Pendiente',
+    cmd_cat_test:'Tests', cmd_cat_traf:'Tráfico', cmd_cat_cam:'Cámara', cmd_cat_info:'Info'
   },
   en: {
     help_btn:'❓ Help', help_close:'Close help', theme_dark:'🌙 Dark', theme_light:'☀️ Light',
-    export:'📦 JS engine', sub:'Bristle Dahl–Stribeck · slope · ABS/TCS · ADAS · traffic',
-    sec_tele:'Telemetry + GPS', sec_traf:'Traffic', tl_gear:'gear', tl_hdg:'heading °',
+    export:'📦 JS engine', sub:'Track engineer · verifiable physics · not arcade',
+    sec_tele:'Telemetry + simulated GPS', sec_traf:'Traffic', tl_gear:'gear', tl_hdg:'ψ ° (0=+Z)',
     traf_n:'Cars', traf_v:'Traffic speed', traf_add:'+ car', traf_clr:'Clear', traf_test:'Traffic test',
-    running:'running', empty_traf:'No traffic'
+    running:'running', empty_traf:'No traffic',
+    hud_nopit:'NO TRACK', hud_setup:'⚙ Setup', hud_tools:'Tools', hud_close:'Close',
+    hud_export:'Export engine (JS)',
+    ses_label:'SESSION', ses_light:'LIGHTS', ses_free:'Practice', ses_quali:'Qualifying',
+    ses_race:'Race', ses_stint:'Endurance stint', ses_wait:'Wait',
+    ses_go:'▶ Go out', ses_stop:'⏹', ses_pit:'🔧 Pits', ses_run:'▶ Start',
+    pit_title:'🔧 PIT STOP', pit_compound:'Compound', pit_fuel:'⛽ Refuel to 60 L',
+    pit_repair:'🛠️ Repair (10s)', pit_done:'Done',
+    cmd_cat_track:'Track', cmd_cat_tire:'Tyre', cmd_cat_surf:'Surface',
+    cmd_cat_go:'Run', cmd_cat_adas:'ADAS', cmd_cat_slope:'Grade',
+    cmd_cat_test:'Tests', cmd_cat_traf:'Traffic', cmd_cat_cam:'Camera', cmd_cat_info:'Info'
   }
 };
 function applyI18n(){
@@ -6746,6 +7159,20 @@ function applyI18n(){
     var k = el.getAttribute('data-i18n');
     if (pack[k]) el.textContent = pack[k];
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
+    var k = el.getAttribute('data-i18n-placeholder');
+    if (pack[k]) el.setAttribute('placeholder', pack[k]);
+  });
+  var mapBtn={btnToolsMenu:'hud_setup', btnSessionStart:'ses_go', btnPitCall:'ses_pit',
+    btnVehicleRunBar:'ses_run', btnExportEngineMenu:'hud_export'};
+  Object.keys(mapBtn).forEach(function(id){
+    var el=document.getElementById(id); if(el && pack[mapBtn[id]]) el.textContent=pack[mapBtn[id]];
+  });
+  var optMap={free:'ses_free',quali:'ses_quali',race:'ses_race',stint:'ses_stint'};
+  var sel=document.getElementById('sessionModeSel');
+  if(sel){ Array.prototype.forEach.call(sel.options, function(op){ if(optMap[op.value]&&pack[optMap[op.value]]) op.textContent=pack[optMap[op.value]]; }); }
+  var pitT=document.querySelector('#pitOverlay > div');
+  if(pitT && pack.pit_title) pitT.textContent=pack.pit_title;
   var sub = document.querySelector('.brand .sub');
   if (sub) sub.textContent = pack.sub;
   var run = document.querySelector('.status span:first-child');
@@ -6772,6 +7199,7 @@ function applyI18n(){
 function setLang(l){
   uiLang = (l === 'en') ? 'en' : 'es';
   try { localStorage.setItem('tiresim_lang', uiLang); } catch(e){}
+  try { uiState.lang = uiLang; saveUiPrefs(); } catch(eU){}
   applyI18n();
 }
 
@@ -6843,6 +7271,54 @@ function loop(ts){
   try { stepVehicle(dt); } catch(eStep){ console.error('stepVehicle', eStep); }
   try { if (typeof RaceLabGhost !== 'undefined') RaceLabGhost.tick(dt); } catch(eG){}
   try { if (typeof RaceLabGrid !== 'undefined') RaceLabGrid.tick(dt); } catch(eGrid){}
+  try {
+    var hudT=document.getElementById('hudTrack');
+    if (hudT){
+      var L=TRACK.totalLength||0;
+      hudT.textContent = L>5600&&L<5900?'MONZA': L>6400&&L<7400?'SPA': L>5000&&L<5600?'MADRID': L>400&&L<700?'OVAL': L>50?((uiLang==='en'?'TRACK ':'PISTA ')+L.toFixed(0)+' m'):((I18N[uiLang]||I18N.es).hud_nopit);
+    }
+    var hudL=document.getElementById('hudLaps'); if(hudL) hudL.textContent=chassis._lapCount||0;
+    var hudLive=document.getElementById('hudLive');
+    if(hudLive){
+      var t=chassis._lapTimer||0; var mm=Math.floor(t/60), ss=(t%60).toFixed(2).padStart(5,'0');
+      hudLive.textContent=(mm<10?'0':'')+mm+':'+ss;
+    }
+    var hudD=document.getElementById('hudDelta');
+    if(hudD){
+      var best=chassis._bestLapTime, t0=chassis._lapTimer||0;
+      if(best){ var d=t0-best; hudD.textContent='Δ '+(d>=0?'+':'')+d.toFixed(2); hudD.className=d<=0?'ok':'warn'; }
+      else hudD.textContent='Δ —';
+    }
+    var hudF=document.getElementById('hudFuel'); if(hudF) hudF.textContent='⛽ '+(vehicle.fuelL||0).toFixed(0)+' L';
+    var hudP=document.getElementById('hudPos');
+    if(hudP && typeof RaceLabGrid!=='undefined' && RaceLabGrid.standings){
+      var rows=RaceLabGrid.standings();
+      var me=rows.findIndex(function(r){return r.id==='TÚ';});
+      hudP.textContent = me>=0 ? (me+1)+'/'+rows.length : '—';
+    }
+    var lt=document.getElementById('liveLapTime');
+    if (lt){
+      var t0 = chassis._lapTimer || 0;
+      lt.textContent = t0.toFixed(2);
+      var ls=document.getElementById('liveLapS');
+      if (ls) ls.textContent = TRACK.totalLength && chassis._trackProj ? (100*chassis._trackProj.s/TRACK.totalLength).toFixed(0) : '0';
+      var ld=document.getElementById('liveLapDelta');
+      if (ld){
+        var best=chassis._bestLapTime;
+        ld.textContent = best ? ((t0-best)>=0?'+':'')+(t0-best).toFixed(2) : '—';
+      }
+    }
+    var stP=document.getElementById('standingsPanel');
+    if (stP && typeof RaceLabGrid!=='undefined' && RaceLabGrid.standings){
+      var rows=RaceLabGrid.standings();
+      if (rows.length>1){
+        stP.textContent = rows.map(function(r,i){
+          var best=r.best!=null?r.best.toFixed(2)+'s':'—';
+          return 'P'+(i+1)+' '+r.id+'  V'+r.laps+'  s='+(r.s||0).toFixed(0)+'  best '+best;
+        }).join('\n');
+      }
+    }
+  } catch(eLive){}
   try { if (typeof RaceLabReport !== 'undefined') RaceLabReport.tick(dt); } catch(eRep){}
   try { if (typeof RaceLabSession !== 'undefined') RaceLabSession.tick(dt); } catch(eSes){}
 
@@ -6885,7 +7361,9 @@ function init(){
   if (btnLevelLab) btnLevelLab.addEventListener('click', function(){ setDetailLevel('lab'); });
   var savedLevel = 'drive';
   try { savedLevel = localStorage.getItem('drivecore_level') || 'drive'; } catch(e){}
-  setDetailLevel(savedLevel); // por defecto, "Conducir": quien quiera más pulsa Ajustar/Laboratorio
+  var savedLevel2 = 'drive';
+  try { savedLevel2 = localStorage.getItem('drivecore_level') || 'drive'; } catch(eLv){}
+  setDetailLevel(savedLevel2);
   var mm = document.getElementById('vModelMode');
   if (mm) mm.addEventListener('change', function(){ vehicle.modelMode = this.value; showToast(this.value === '6dof' ? '6DOF on' : '3DOF planta'); });
   var bh = document.getElementById('btnHopTest');
@@ -6910,6 +7388,92 @@ function init(){
     if (!vehicleRunning) toggleVehicleRunning();
     showToast('Flex test: torsión blanda + dirección');
   });
+  (function layoutRaceLab(){
+    var hud=document.getElementById('hudStrip');
+    var stage=document.getElementById('stage');
+    var man=document.getElementById('manualPanel');
+    if (man && stage && stage.parentNode) stage.parentNode.insertBefore(man, stage.nextSibling);
+    if (hud){
+      var sel=document.getElementById('sessionModeSel');
+      var tim=document.getElementById('sessionTimer');
+      var more=document.getElementById('btnMoreTools');
+      if (sel) hud.insertBefore(sel, more || hud.firstChild);
+      if (tim) hud.insertBefore(tim, more || null);
+      var lang=document.querySelector('.lang-switch');
+      var theme=document.getElementById('btnTheme');
+      var ref=more || null;
+      if (lang) hud.insertBefore(lang, ref);
+      if (theme) hud.insertBefore(theme, ref);
+    }
+    var ls=document.getElementById('levelSelector');
+    if (ls && ls.parentNode) ls.parentNode.removeChild(ls);
+  })();
+  var btnMore=document.getElementById('btnMoreTools');
+  var toolsDlg0=document.getElementById('toolsMenu');
+  if (btnMore && toolsDlg0){
+    btnMore.addEventListener('click', function(){
+      toolsDlg0.style.display='block';
+      if (toolsDlg0.showModal){ try{ toolsDlg0.showModal(); }catch(eM){ toolsDlg0.setAttribute('open',''); } }
+      else toolsDlg0.setAttribute('open','');
+    });
+  }
+  var btnTools=document.getElementById('btnToolsMenu');
+  var toolsDlg=document.getElementById('toolsMenu');
+  var toolsSlot=document.getElementById('toolsSlot');
+  var statusBox=document.querySelector('.header .status');
+  if (toolsSlot && statusBox && !toolsSlot.childElementCount){
+    while (statusBox.firstChild) toolsSlot.appendChild(statusBox.firstChild);
+  }
+  if (btnTools && toolsDlg){
+    btnTools.addEventListener('click', function(){ openSetupDrawer(); });
+  }
+  function openSetupDrawer(){
+    var drawer=document.getElementById('setupDrawer');
+    var body=document.getElementById('setupDrawerBody');
+    var main=document.getElementById('mainContent');
+    var host=document.getElementById('setupToolsHost');
+    var slot=document.getElementById('toolsSlot');
+    var toolsDlg=document.getElementById('toolsMenu');
+    if (host && host.childElementCount===0){
+      ['btnLevelDriveMenu','btnLevelAdjustMenu','btnLevelLabMenu','btnExportEngineMenu'].forEach(function(id){
+        var el=document.getElementById(id); if(el) host.appendChild(el);
+      });
+    }
+    if (drawer && body && main && body.childElementCount===0){
+      body.appendChild(main);
+    }
+    if (!drawer) return;
+    drawer.style.display='block';
+    if (drawer.showModal){
+      try { drawer.showModal(); }
+      catch(eDr){ drawer.setAttribute('open',''); }
+    } else {
+      drawer.setAttribute('open','');
+    }
+  }
+  function closeSetupDrawer(){
+    var drawer=document.getElementById('setupDrawer');
+    if (!drawer) return;
+    if (drawer.close){ try{ drawer.close(); }catch(eCl){} }
+    drawer.removeAttribute('open');
+    drawer.style.display='';
+  }
+  var setupClose=document.getElementById('setupDrawerClose');
+  if (setupClose) setupClose.addEventListener('click', closeSetupDrawer);
+  var setupDr=document.getElementById('setupDrawer');
+  if (setupDr) setupDr.addEventListener('cancel', function(){ closeSetupDrawer(); });
+  var expM=document.getElementById('btnExportEngineMenu');
+  if (expM) expM.addEventListener('click', function(){
+    var b=document.getElementById('btnExportEngine');
+    if (b) b.click();
+  });
+  function bindLevelAlias(id, level){
+    var el=document.getElementById(id);
+    if (el) el.addEventListener('click', function(){ setDetailLevel(level); });
+  }
+  bindLevelAlias('btnLevelDriveMenu','drive');
+  bindLevelAlias('btnLevelAdjustMenu','adjust');
+  bindLevelAlias('btnLevelLabMenu','lab');
   document.getElementById('btnTheme').addEventListener('click', toggleTheme);
   document.getElementById('btnExportEngine').addEventListener('click', exportEngine);
   document.getElementById('btnManual').addEventListener('click', function(){
@@ -7061,7 +7625,34 @@ recta 200 0
   }
 };
 
-(function initExternalTracks(){
+function applyNamedTrack(id){
+  if (typeof TIRE_SIM_TRACKS === 'undefined' || !TIRE_SIM_TRACKS[id]) return false;
+  var t = TIRE_SIM_TRACKS[id];
+  var segs = [];
+  (t.segments || '').split('\n').forEach(function(line){
+    var p = line.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!p.length) return;
+    if (p[0] === 'recta' || p[0] === 'straight')
+      segs.push({ type:'straight', length: parseFloat(p[1])||50, gradePct: parseFloat(p[2])||0 });
+    else if (p[0] === 'curva' || p[0] === 'curve')
+      segs.push({ type:'curve', radius: parseFloat(p[1])||40, angleDeg: parseFloat(p[2])||90,
+                  bankDeg: parseFloat(p[3])||0, gradePct: parseFloat(p[4])||0 });
+  });
+  if (!segs.length) return false;
+  TRACK.build(segs, t.width || 10);
+  chassis.x = 0; chassis.z = 0; chassis.psi = 0;
+  chassis.u = 0; chassis.w = 0; chassis.r = 0;
+  chassis._distTraveled = 0;
+  chassis._lapTimer = 0; chassis._lastSector = null; chassis._sectorStartTimer = 0;
+  if (typeof buildTrackMesh === 'function') buildTrackMesh();
+  if (typeof notifyTrackChanged === 'function') notifyTrackChanged();
+  if (typeof showToast === 'function') showToast(t.label || id);
+  return true;
+}
+window.applyNamedTrack = applyNamedTrack;
+window.loadExternalTrack = applyNamedTrack;
+
+function initExternalTracks(){
   var ids = Object.keys(TIRE_SIM_TRACKS);
   if (!ids.length) return;
 
@@ -7140,7 +7731,8 @@ recta 200 0
 
   btnRow.parentNode.insertBefore(row, btnRow.nextSibling);
   console.info('[AutoDynamics] Circuitos externos cargados: ' + ids.join(', '));
-})();
+}
+initExternalTracks();
 
 /* ============================================================
    ControlsPro — mandos analógicos, curvas, haptics, tilt, rumble.
@@ -7557,6 +8149,7 @@ var CommandParser = (function(){
   }
 
   function loadExternalTrack(id){
+    if (typeof applyNamedTrack === 'function' && applyNamedTrack(id)) return true;
     var row = document.getElementById('externalTracksRow');
     if (row){
       var btns = row.querySelectorAll('button');
@@ -7620,6 +8213,7 @@ var CommandParser = (function(){
     if (modes.indexOf(mode) === -1) return false;
     cameraMode = mode;
     fixedCamReady = false;
+    window._fixedWorldCam = null;
     var labels = {
       chase:'🎥 Cámara: persecución', hood:'🎥 Cámara: capó',
       cockpit:'🎥 Cámara: cockpit', free:'🎥 Cámara: libre',
@@ -7646,7 +8240,7 @@ var CommandParser = (function(){
         var ok = loadExternalTrack(m[1]);
         showToast(ok ? ('🏁 ' + m[1].toUpperCase() + ' cargado') : ('No he podido cargar ' + m[1]));
       },
-      desc: 'carga <monza|spa|madrid>', cat: 'Circuito' },
+      desc: 'carga <monza|spa|madrid>', descEn: 'load <monza|spa|madrid>', cat: 'Circuito' },
 
     { re: /^(?:carga|cargar)\s+(ovalo|puerto|montana|eses)$/,
       fn: function(m){
@@ -7664,11 +8258,11 @@ var CommandParser = (function(){
           showToast('🏁 ' + m[1] + ' cargado');
         }
       },
-      desc: 'carga <ovalo|puerto|montana|eses>', cat: 'Circuito' },
+      desc: 'carga <ovalo|puerto|montana|eses>', descEn: 'load <oval|hill|mountain|esses>', cat: 'Circuito' },
 
     { re: /^(?:quitar|clear)\s+(?:circuito|track)$/,
       fn: function(){ clickById('btnTrackClear'); },
-      desc: 'quitar circuito', cat: 'Circuito' },
+      desc: 'quitar circuito', descEn: 'clear track', cat: 'Circuito' },
 
     { re: /^(?:neumatico|compuesto|tire)\s+(calle|deportivo|slick|carrera|invierno|lluvia|todoterreno|camion)$/,
       fn: function(m){
@@ -7705,7 +8299,7 @@ var CommandParser = (function(){
           if (typeof toggleVehicleRunning === 'function') toggleVehicleRunning();
         } else showToast('Ya está en marcha');
       },
-      desc: 'arranca', cat: 'Marcha' },
+      desc: 'arranca', descEn: 'start', cat: 'Marcha' },
 
     { re: /^(para|deten|stop|parar)$/,
       fn: function(){
@@ -7713,11 +8307,11 @@ var CommandParser = (function(){
           if (typeof toggleVehicleRunning === 'function') toggleVehicleRunning();
         } else showToast('Ya está parado');
       },
-      desc: 'para', cat: 'Marcha' },
+      desc: 'para', descEn: 'stop', cat: 'Marcha' },
 
     { re: /^(reset|reinicia|reiniciar)$/,
       fn: function(){ if (typeof resetVehicle === 'function') resetVehicle(); },
-      desc: 'reset', cat: 'Marcha' },
+      desc: 'reset', descEn: 'reset', cat: 'Marcha' },
 
     { re: /^(activar|activa|on|encender|enciende)\s+(abs|tcs|acc|lka|aeb)$/,
       fn: function(m){
@@ -7790,7 +8384,7 @@ var CommandParser = (function(){
 
     { re: /^(ayuda|help|\?|comandos)$/,
       fn: function(){ showCmdHintsAll(); },
-      desc: 'ayuda', cat: 'Info' }
+      desc: 'ayuda', descEn: 'help', cat: 'Info' }
   ];
 
   function dispatch(rawText){
@@ -7841,7 +8435,7 @@ var CommandParser = (function(){
     Object.keys(groups).forEach(function(cat){
       html += '<div class="cmd-hint-cat">' + cat + '</div>';
       groups[cat].forEach(function(c){
-        html += '<div class="cmd-hint-row"><code>' + c.desc + '</code></div>';
+        html += '<div class="cmd-hint-row"><code>' + (uiLang==='en' && c.descEn ? c.descEn : c.desc) + '</code></div>';
       });
     });
     el.innerHTML = html;
@@ -7859,7 +8453,7 @@ var CommandParser = (function(){
     if (!q){ hideHints(); return; }
     var words = q.split(/\s+/).filter(Boolean);
     var matches = registry.filter(function(c){
-      var hay = norm(c.desc + ' ' + c.cat);
+      var hay = norm(c.desc + ' ' + (c.descEn||'') + ' ' + c.cat);
       return words.every(function(w){ return hay.indexOf(w) !== -1; });
     });
     if (!matches.length){ hideHints(); return; }
@@ -7919,7 +8513,8 @@ var CommandParser = (function(){
     dispatch: dispatch,
     registry: registry,
     showHelp: showCmdHintsAll,
-    history: getHistory
+    history: getHistory,
+    loadTrack: loadExternalTrack
   };
 })();
 
@@ -8666,12 +9261,26 @@ var ReplayLap = (function(){
   function startPlaying(){
     if (recordBuffer.length === 0){
       try {
-        var saved = localStorage.getItem('drivecore_saved_lap');
-        if (saved){
-          var data = JSON.parse(saved);
+        var data = LocalStore.read('drivecore_saved_lap', 2, null);
+        if (!data || !data.samples || !data.initial){
+          try {
+            var raw = localStorage.getItem('drivecore_saved_lap');
+            if (raw){
+              var legacy = JSON.parse(raw);
+              if (legacy && legacy.samples && legacy.initial){
+                data = legacy;
+                LocalStore.write('drivecore_saved_lap', legacy, 2);
+              }
+            }
+          } catch(eLeg){}
+        }
+        if (data && data.samples && data.initial){
           recordBuffer = data.samples;
           initialSnapshot = data.initial;
           showToast('▶ Reproduciendo vuelta guardada');
+        } else if (LocalStore.has('drivecore_saved_lap')){
+          showToast('La vuelta guardada no se pudo leer (formato incompatible)');
+          return;
         } else {
           showToast('No hay vuelta grabada');
           return;
@@ -8709,11 +9318,11 @@ var ReplayLap = (function(){
       return;
     }
     try {
-      localStorage.setItem('drivecore_saved_lap', JSON.stringify({
+      LocalStore.write('drivecore_saved_lap', {
         savedAt: new Date().toISOString(),
         samples: recordBuffer,
         initial: initialSnapshot
-      }));
+      }, 2);
       showToast('💾 Vuelta guardada en el navegador');
     } catch(e){
       showToast('No se pudo guardar (¿espacio?)');
@@ -9017,8 +9626,14 @@ function runSelfTest(){
           '|Fy|(κ=0)=' + Math.abs(pura.Fy).toFixed(0) + ' |Fy|(κ=0.15)=' + Math.abs(conKappa.Fy).toFixed(0));
     check('Combinado: κ=0.15 produce Fx > 0 (antes era 0 con κ=0)',
           Math.abs(conKappa.Fx) > 500, 'Fx=' + conKappa.Fx.toFixed(0));
-    check('Combinado no cambia el caso puro (κ=0, gripScale=1.0, idéntico al peak ya verificado)',
-          Math.abs(Math.abs(pura.Fy) - 1973) < 5, '|Fy|=' + Math.abs(pura.Fy).toFixed(0));
+    (function(){
+      var pacejkaPeak = (typeof tireShape !== 'undefined' && tireShape.combined)
+        ? Math.abs(tireShape.combined(0, 8*Math.PI/180, 4000, 0).Fy) : Math.abs(pura.Fy);
+      var ratio = Math.abs(pura.Fy) / Math.max(1, pacejkaPeak);
+      check('Combinado se reduce al caso puro (Fy 40–105% del peak Pacejka)',
+            ratio > 0.40 && ratio <= 1.05,
+            'ratio=' + ratio.toFixed(3) + ' Fy=' + Math.abs(pura.Fy).toFixed(0));
+    })();
   } catch(e){ check('Combinado dahl_pacejka sin excepción', false, e.message); }
 
   // ---- 14. gripScale: escala el pico sin tocar la forma ni la transición ----
@@ -9083,6 +9698,21 @@ function runSelfTest(){
   try {
     check('RaceLabGrid definido', typeof RaceLabGrid === 'object');
     check('RaceLabGrid API completa', typeof RaceLabGrid.spawn === 'function' && typeof RaceLabGrid.tick === 'function');
+    check('applyNamedTrack global', typeof applyNamedTrack === 'function');
+    var nEn = 0;
+    if (typeof CommandParser !== 'undefined' && CommandParser.registry){
+      CommandParser.registry.forEach(function(c){ if (c.descEn) nEn++; });
+    }
+    check('CommandParser tiene descEn', nEn >= 3);
+    check('KalmanEN expuesto', typeof KalmanEN === 'object' && typeof KalmanEN.step === 'function');
+    check('EkfSlam Jacobiana', typeof EkfSlam === 'object' && typeof EkfSlam.mul3 === 'function');
+    check('ParticleLoc estratificado', typeof ParticleLoc === 'object' && typeof ParticleLoc.step === 'function');
+    if (typeof KalmanEN !== 'undefined'){
+      KalmanEN.reset();
+      var g={eastMeas:0,northMeas:0,hdop:1,v:0};
+      for (var ki=0;ki<30;ki++) KalmanEN.step(0.02, g);
+      check('Kalman P finita', isFinite(KalmanEN.P[0]) && KalmanEN.P[0] < 50);
+    }
   } catch(e){ check('Fase 2 sin excepción', false, e.message); }
   try {
     var testSt = { x:0,z:0,psi:0,u:0,w:0,r:0,gear:1,wheelOmega:{},wheelFx:{},wheelFy:{},wheelFz:{}, zS:0,theta:0,phi:0,zSdot:0,thetaDot:0,phiDot:0, distTraveled:0, _tire:{}, _bristleKey:'selftest_' };
@@ -9464,6 +10094,9 @@ var RaceLabPlan = (function(){
     }
     if(document.getElementById('planShowSectors') && document.getElementById('planShowSectors').checked){
       var cols=['#e8a54b','#4ecdc4','#7c4dff'];
+      if (typeof RaceLabDelta!=='undefined' && RaceLabDelta.colorForSector){
+        cols=[RaceLabDelta.colorForSector(0), RaceLabDelta.colorForSector(1), RaceLabDelta.colorForSector(2)];
+      }
       for(var sec=1;sec<3;sec++){
         var pMark=TRACK.pointAtS(TRACK.totalLength*sec/3);
         var qMark=worldToScreen(pMark.x,pMark.z,view);
@@ -9553,7 +10186,12 @@ var RaceLabPlan = (function(){
       hoverS=proj?proj.s:null; draw();
     });
     canvas.addEventListener('mouseleave', function(){ hoverS=null; draw(); });
-    setInterval(function(){ if(TRACK.segs.length) draw(); }, 80);
+    setInterval(function(){
+      if(!TRACK.segs.length) return;
+      var cv=document.getElementById('trackPlanView');
+      if(!cv || cv.offsetParent===null) return;
+      draw();
+    }, 80);
     draw();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
@@ -9675,7 +10313,8 @@ var RaceLabGrid = (function(){
     var s0Start=chassis._trackProj?chassis._trackProj.s:0;
     for(var i=0;i<count;i++){
       var s0=(s0Start+(i+1)*(spacingM||15))%TRACK.totalLength;
-      var rival={ id:'R'+(i+1), level:levelKey, state:makeRivalState(s0,levelKey), mesh:null };
+      var rival={ id:'R'+(i+1), level:levelKey, state:makeRivalState(s0,levelKey), mesh:null,
+        lapCount:0, lastLap:null, bestLap:null, lastS:s0, lapT:0 };
       rivals.push(rival); ensureMesh(rival);
     }
     if(typeof showToast==='function') showToast('🏁 '+count+' rivales ('+levelKey+')');
@@ -9702,8 +10341,29 @@ var RaceLabGrid = (function(){
         stepVehicleWithState(rival.state, subDt, inputs);
         if(rival.mesh){ rival.mesh.position.set(rival.state.x,0.35,rival.state.z); rival.mesh.rotation.y=rival.state.psi; }
         else ensureMesh(rival);
+        rival.lapT = (rival.lapT||0) + subDt;
+        var projR = TRACK.projectOntoTrack(rival.state.x, rival.state.z);
+        var sR = projR ? projR.s : (rival.lastS||0);
+        if ((rival.lastS||0) > TRACK.totalLength*0.7 && sR < TRACK.totalLength*0.15){
+          rival.lapCount = (rival.lapCount||0)+1;
+          rival.lastLap = rival.lapT;
+          if (rival.bestLap==null || rival.lapT < rival.bestLap) rival.bestLap = rival.lapT;
+          rival.lapT = 0;
+        }
+        rival.lastS = sR;
+        rival.s = sR;
       });
     }
+  }
+  function standings(){
+    var rows = rivals.map(function(r){
+      return { id:r.id, level:r.level, laps:r.lapCount||0, s:r.s||0, last:r.lastLap, best:r.bestLap };
+    });
+    var egoS = chassis._trackProj ? chassis._trackProj.s : 0;
+    var egoLaps = chassis._lapCount||0;
+    rows.push({ id:'TÚ', level:'ego', laps:egoLaps, s:egoS, last:chassis._lastLapTime, best:chassis._bestLapTime });
+    rows.sort(function(a,b){ return (b.laps-a.laps) || (b.s-a.s); });
+    return rows;
   }
   function bindUI(){
     var anchor=document.getElementById('btnAdasTest');
@@ -9724,7 +10384,7 @@ var RaceLabGrid = (function(){
     document.getElementById('btnGridClear').addEventListener('click', function(){ clear(); });
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bindUI); else bindUI();
-  return { tick:tick, spawn:spawn, clear:clear, getRivals:function(){return rivals;} };
+  return { tick:tick, spawn:spawn, clear:clear, standings:standings, getRivals:function(){return rivals;} };
 })();
 
 var RaceLabEngineerKit = (function(){
@@ -9836,12 +10496,13 @@ var RaceLabReport = (function(){
     var avgT=temps.length?temps.reduce(function(a,b){return a+b;},0)/temps.length:25;
     currentWheelDefs.forEach(function(w){
       var t = (typeof wheels !== 'undefined') ? wheels[w.id] : null;
-      var Fz = (chassis._lastFz && chassis._lastFz[w.id] != null) ? chassis._lastFz[w.id] : 3000;
-      if (t && Fz > 100){
-        mus.push(Math.hypot(t.FxAct||0, t.FyAct||0) / Fz);
+      var Fz = (chassis._lastFz && chassis._lastFz[w.id] != null) ? chassis._lastFz[w.id] : null;
+      if (t && Fz != null && Fz > 100){
+        var f = Math.hypot(t.FxAct||0, t.FyAct||0);
+        if (isFinite(f)) mus.push(f / Fz);
       }
     });
-    var avgMu = mus.length ? mus.reduce(function(a,b){return a+b;},0)/mus.length : 0;
+    var avgMu = mus.length ? mus.reduce(function(a,b){return a+b;},0)/mus.length : null;
     var secs=typeof RaceLabDelta!=='undefined'?RaceLabDelta.getSectorTimes():[0,0,0];
     return { lapTime:lapTime, bestLap:bestLap, sectors:secs, wear:avgW, temp:avgT, mu:avgMu, off: typeof RaceLabDelta!=='undefined'?RaceLabDelta.getOffTrack():0, fuel:vehicle.fuelL||0 };
   }
@@ -9858,7 +10519,7 @@ var RaceLabReport = (function(){
     set('repTireWearAvg', (rep.wear*100).toFixed(0)+'%');
     set('repTireTempAvg', rep.temp.toFixed(0)+'°C');
     set('repOffTrack', String(rep.off));
-    set('repMuEff', (rep.mu||0).toFixed(2));
+    set('repMuEff', (rep.mu == null) ? '—' : rep.mu.toFixed(2));
     var rf=document.getElementById('reportFuel'); if(rf) rf.textContent=(rep.fuel).toFixed(1)+' L restantes';
     var ttc = (chassis._ttc != null && chassis._ttc < 20) ? chassis._ttc.toFixed(2)+'s' : '—';
     set('repTtcMin', ttc);
@@ -9888,7 +10549,7 @@ var RaceLabReport = (function(){
 
 var RaceLabSession = (function(){
   var mode='free', phase='idle', elapsed=0, lapCount=0, stintRemaining=0, raceLaps=5;
-  var scState={s:0,u:12,x:0,z:0,psi:0}, scMesh=null;
+  var scState={s:0,u:12,x:0,z:0,psi:0}, scMesh=null, scTimer=null;
   function setLight(state){
     var el=document.getElementById('sessionLight'), txt=document.getElementById('sessionState');
     if(!el) return;
@@ -9925,7 +10586,13 @@ var RaceLabSession = (function(){
       phase='formation'; raceLaps=5;
       if(TRACK.segs.length){ var p0=TRACK.pointAtS(0); scState.x=p0.x; scState.z=p0.z; scState.psi=p0.heading||0; scState.s=0; }
       if(typeof showToast==='function') showToast('🏁 Formación: safety car cinemático');
-      setTimeout(function(){ if(phase==='formation'){ phase='green'; setLight('green'); if(typeof showToast==='function') showToast('🟢 Verde'); } }, 25000);
+      scTimer = setTimeout(function(){
+        scTimer = null;
+        if(phase==='formation'){
+          phase='green'; setLight('green');
+          if(typeof showToast==='function') showToast('🟢 Verde');
+        }
+      }, 25000);
     } else if(mode==='stint'){
       phase='green'; stintRemaining=15*60;
       if(typeof showToast==='function') showToast('⏱️ Stint 15 min');
@@ -9978,10 +10645,10 @@ var RaceLabSession = (function(){
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">';
     compuestos.forEach(function(c){ html+='<button class="btn btn-secondary" data-pit-tire="'+c+'" style="padding:10px;">Cambiar a '+c+'</button>'; });
     html+='</div>';
-    html+='<button class="btn btn-primary" data-pit-fuel="1" style="padding:10px;margin-top:8px;">⛽ Repostar hasta 60 L</button>';
-    html+='<button class="btn btn-warning" data-pit-repair="1" style="padding:10px;">🛠️ Reparar (10s)</button>';
+    html+='<button class="btn btn-primary" data-pit-fuel="1" style="padding:10px;margin-top:8px;">'+((I18N[uiLang]||I18N.es).pit_fuel)+'</button>';
+    html+='<button class="btn btn-warning" data-pit-repair="1" style="padding:10px;">'+((I18N[uiLang]||I18N.es).pit_repair)+'</button>';
     content.innerHTML=html;
-    overlay.style.display='block';
+    if(overlay.showModal){ try{ overlay.showModal(); }catch(ePit){ overlay.setAttribute('open',''); } } else overlay.style.display='block';
     content.querySelectorAll('[data-pit-tire]').forEach(function(btn){
       btn.addEventListener('click', function(){
         vehicle.pitState={action:'tire',tire:btn.getAttribute('data-pit-tire'),timeLeft:8};
@@ -10000,7 +10667,7 @@ var RaceLabSession = (function(){
       closePit(); runPitTimer();
     });
   }
-  function closePit(){ var o=document.getElementById('pitOverlay'); if(o) o.style.display='none'; }
+  function closePit(){ var o=document.getElementById('pitOverlay'); if(!o) return; if(o.close){ try{ o.close(); }catch(eC){} } o.style.display='none'; o.removeAttribute('open'); }
   function runPitTimer(){
     if(!vehicle.pitState) return;
     var startWall=performance.now();
@@ -10028,6 +10695,12 @@ var RaceLabSession = (function(){
     var btnStart=document.getElementById('btnSessionStart');
     if(btnStart) btnStart.addEventListener('click', function(){
       if(!TRACK.segs.length){ if(typeof showToast==='function') showToast('Carga un circuito primero'); return; }
+      if(phase==='formation'){
+        if (scTimer) { clearTimeout(scTimer); scTimer = null; }
+        phase='green'; setLight('green');
+        if(typeof showToast==='function') showToast('🟢 Verde (saltado)');
+        return;
+      }
       start();
       if(!vehicleRunning && typeof toggleVehicleRunning==='function') toggleVehicleRunning();
     });
